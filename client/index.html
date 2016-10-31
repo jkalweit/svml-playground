@@ -1,0 +1,157 @@
+<htme>
+<head>
+<link rel="stylesheet" type="text/css" href="/css/app.css">
+<link rel="import" id="components" href="/components.html">
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNode.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/syncnode/SyncView.js"></script>
+<script type="text/javascript" src="/syncnode/SyncViewML.js"></script>
+</head>
+<body>
+
+
+<script id="views" type="text/syncviewml">
+
+#mainView:MainView
+
+MainView[row-flex]
+	:style
+		padding: 8px;
+		background-color: #DDD;
+	#editor:Editor
+	#preview:Preview
+	#render:function
+		this.editor.update(this.data);
+		this.preview.update(this.data, true);
+
+
+Editor[row-fill]
+	#title:h2 'Editor'
+	#code:textarea$(data.code)
+		style:
+			width: 100%;
+			height: 25em;
+			tab-size: 4;
+		events:
+			keydown:function(e)
+				if(e.keyCode === 9) {
+					e.preventDefault();
+					var val = this.code.value;
+					var start = this.code.selectionStart;
+					var end = this.code.value.length;
+					var pre = val.substring(0, start);
+					var post = val.substring(start, end);
+					this.code.value = pre + '\t' + post;
+					this.code.selectionStart = start + 1;
+					this.code.selectionEnd = this.code.selectionStart;
+					return false;	
+				}
+				if(e.ctrlKey && e.keyCode === 83) {
+					e.preventDefault();
+					this.data.set('code', this.code.value);
+					return false;
+				}
+	#dataEditor:textarea
+		style:
+			width: 100%;
+			height: 25em;
+			tab-size: 4;
+		events:
+			keydown:function(e)
+				if(e.keyCode === 9) {
+					e.preventDefault();
+					var val = this.dataEditor.value;
+					var start = this.dataEditor.selectionStart;
+					var end = this.dataEditor.value.length;
+					var pre = val.substring(0, start);
+					var post = val.substring(start, end);
+					this.dataEditor.value = pre + '\t' + post;
+					this.dataEditor.selectionStart = start + 1;
+					this.dataEditor.selectionEnd = this.dataEditor.selectionStart;
+					return false;	
+				}
+				if(e.ctrlKey && e.keyCode === 83) {
+					console.log('here');
+					e.preventDefault();
+					try {
+						eval('var data = ' + this.dataEditor.value);
+						data.version = SyncNode.guidShort();
+						console.log('datdddddda', data);
+						this.data.merge({
+							__remove: 'data',
+							data: data
+						});
+					} catch (e) {
+						console.log('Could not parse data.');
+					}
+					return false;
+				}
+	#init:function
+		this.code.setAttribute('spellcheck', false);
+		this.dataEditor.setAttribute('spellcheck', false);
+	#render:function
+		console.log('this.data.data', this.data.data);
+		var asString = typeof this.data.data === 'string' ? this.data.data : JSON.stringify(this.data.data, null, "\t");
+		console.log('as string', asString);
+		this.dataEditor.value = asString;
+	
+	
+Preview[row-fill]
+	#title:h2 'Preview'
+	#preview
+		style:
+			background-color: #FFF;
+			border: 1px solid #000;
+			margin: 8px;
+	#render:function
+		this.preview.innerHTML = '';
+		var svml2 = new SyncViewML();
+		svml2.parse(this.data.code, this.preview); 
+		try {
+			var data;
+			if(typeof this.data.data === 'string') {
+				eval('data = ' + this.data.data);  //JSON.parse(this.data.data);
+			} else {
+				data = this.data.data;
+			}
+			var sync = new SyncNode(data);
+			sync.on('updated', (updated) => {
+				this.data.set('data', updated);
+			});
+			svml2.instances.mainView.update(sync);
+		} catch (e) {
+			console.log('Could not parse data2.');
+		}
+		
+
+</script>
+
+
+
+<script>
+"use strict"
+
+
+SV.startReloader();
+
+var sync = new SyncNodeSocket('/data', {});
+window.List = List;
+window.Input = Input;
+
+var svml = new SyncViewML();
+SV.onLoad(() => { 
+		svml.importCode('components'); 
+		svml.parse(SV.id('views').innerHTML); 
+		sync.on('updated', (data) => {
+			console.log('data', data);
+			svml.instances.mainView.update(data, true);
+		});
+});
+
+
+
+
+</script>
+</body>
+</html>

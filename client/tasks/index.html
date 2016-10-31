@@ -1,0 +1,356 @@
+<html>
+<head>
+<link rel="stylesheet" type="text/css" href="/css/app.css">
+<link rel="import" id="components" href="/components.html">
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/moment.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNode.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/syncnode/SyncView.js"></script>
+<script type="text/javascript" src="/syncnode/SyncViewML.js"></script>
+</head>
+<body>
+
+
+<script id="views" type="text/syncviewml">
+
+#hub:Hub
+#tasksList:TasksList
+!#editTask:EditTask
+!#completeTask:CompleteTask
+!#taskHistory:TaskHistory
+!#editCategories:EditCategories
+!#editCategory:EditCategory
+
+
+Hub
+	#select:function(key)
+		this.filter.selected = this.data.tasks.recurring[key];
+		this.emit('filterChanged');
+	#selectCategory:function(key)
+		this.filter.selectedCategory = this.data.tasks.categories[key];
+		this.emit('filterChanged');
+	#init:function
+		this.filter = {};
+	#render:function
+		tasksList.update(this.data.tasks.recurring);
+		editCategories.update(this.data.tasks.categories);
+		var categoryOptions = [];
+		editTask.categorySelect.update(this.data.tasks.categories);
+		if(this.filter.selected) { 
+			this.select(this.filter.selected.key);
+		}
+		if(this.filter.selectedCategory) { 
+			this.selectCategory(this.filter.selectedCategory.key);
+		}
+		return;
+		if(!this.test) {
+			this.test = true;
+			this.select(SV.toArray(this.data.tasks.recurring)[0].key);
+			editTask.show();
+		}
+
+
+TasksList
+	#:style
+	#header:SimpleHeader({ text: 'Tasks', add: true, settings: true })
+		style:
+			color: #FFF;
+			background-color: #00A;
+		events:
+			add:
+				var item = {
+					key: SyncNode.guidShort(),
+					createdAt: new Date().toISOString(),
+					category: '',
+					title: '',
+					note: '',
+					history: {}
+				};
+				this.data.set(item.key, item);
+				//hub.addSection(item);
+				hub.select(item.key);
+				editTask.show();
+			settings:
+				editCategories.show();
+	#list:List({ ctor: 'Task', sort: 'dueAt' })$(update=data)[list]
+	#render:function
+
+Task[item row row-flex]
+	:style
+		background-color: #FFF;
+	#dueAt[row-nofill]
+		style:
+			width: 13em;
+	#category$(data.category)[row-nofill]
+		style:
+			width: 10em;
+	#title$(data.title)[row-fill]
+	#primary$(data.primary)[row-nofill]
+		style:
+			width: 10em;
+	#frequency$(data.frequency)[row-nofill]
+		style:
+			width: 8em;
+	#complete[touch material-icons] 'check'
+		style:
+			margin-right: 8px;
+		events:
+			click:
+				hub.select(this.data.key);		
+				completeTask.show();
+	#history[touch material-icons] 'list'
+		style:
+			margin-right: 8px;
+		events:
+			click:
+				hub.select(this.data.key);		
+				taskHistory.show();
+	#edit[touch material-icons] 'settings'
+		style:
+			margin-right: 8px;
+		events:
+			click:
+				hub.select(this.data.key);		
+				editTask.show();
+	#updateStatus:function
+		var now = moment({ hours: 0 });
+		var dueAt = moment(this.data.dueAt);
+		if(dueAt.isBefore(now)) {
+			this.node.style.backgroundColor = '#F00';
+		} else if(dueAt.isSame(now, 'day')) {
+			this.node.style.backgroundColor = '#FF0';
+		} else if(dueAt.isSame(now.add(1, 'days'), 'day')) {
+			this.node.style.backgroundColor = '#0FF';
+		} else {
+			this.node.style.backgroundColor = '#FFF';
+		}
+		//this.dueAt.innerHTML = dueAt.format('MMM Do YYYY, dddd') + '\n' + dueAt.();
+		this.dueAt.innerHTML = dueAt.calendar(null, {
+			sameDay: '[Today]',
+			nextDay: '[Tomorrow]',
+			nextWeek: 'dddd',
+			lastDay: '[Yesterday]',
+			lastWeek: '[Last] dddd',
+			sameElse: 'MM/DD/YYYY dddd'
+		});
+	#init:function
+		setInterval(() => { this.updateStatus(); }, 60000);
+	#render:function
+		if(this.data.dueAt) {
+			var dueAt = moment(this.data.dueAt);
+			this.updateStatus();
+		}
+
+EditTask
+	#header:SimpleHeader({ text: 'Edit Task', del: true, close: true })
+		events:
+			close:
+				this.modal.hide();
+			delete:
+				Modal.confirm('Delete Task?', this.data.text,  () => {
+					this.data.parent.remove(this.data.key);
+					this.emit('close');
+				});
+	#categorySelect:Select({ label: 'Category', prop: 'name' })
+		events:
+			selected:function(value)
+				this.data.set('category', value);
+	#title:Input({ label: 'Title', prop: 'title' })$(update=data)
+	#note:Input({ label: 'Note', prop: 'note', isTextArea: true })$(update=data)
+		style:
+			height: 5em;
+	#frequencySelect:Select({ label: 'Frequency' })
+		events:
+			selected:function(value)
+				this.data.set('frequency', value);
+	#dueAt:DateInput({ label: 'Due At', prop: 'dueAt' })$(update=data)
+		events:
+			selected:function(value)
+				this.data.set('dueAt', value);
+	#primarySelect:Select({ label: 'Primary' })
+		events:
+			selected:function(value)
+				this.data.set('primary', value);
+	#show:function
+		this.modal.show();	
+	#init:function
+		this.modal = Modal.createModal(this);
+		hub.on('filterChanged', () => { this.update(hub.filter.selected); });
+		this.frequencySelect.update(['Weekly', 'Monthly', 'Quarterly', 'Annually']);
+		this.primarySelect.update(employees);
+		this.dueAt.type = 'date';
+	#render:function
+		if(this.data) {
+			this.categorySelect.select(this.data.category);
+			this.frequencySelect.select(this.data.frequency);
+			this.primarySelect.select(this.data.primary);
+		}
+
+CompleteTask
+	#header:SimpleHeader({ text: 'Complete Task' })
+		events:
+			close:
+				this.modal.hide();
+	#note:Input({ label: 'Note', prop: 'note', isTextArea: true })
+		style:
+			height: 5em;
+	#completedBy:Select({ label: 'CompletedBy' })
+	#complete[btn] 'Complete'
+		events:
+			click:
+				var completedBy = this.completedBy.selectInput.value;
+				if(!completedBy) {
+					Modal.showNotification('Cannot Complete', 'Must select "Completed By"');
+					return;
+				}
+				var historyItem = {
+					key: SyncNode.guidShort(),
+					completedAt: new Date().toISOString(),
+					completedBy: completedBy,
+					note: this.note.input.value
+				};
+				this.data.history.set(historyItem.key, historyItem);
+				var nextDueAt = moment(this.data.dueAt);
+				switch(this.data.frequency) {
+					case 'Weekly':
+						nextDueAt.add(1, 'weeks');
+						break;
+					case 'Monthly':
+						nextDueAt.add(1, 'months');
+						break;
+					case 'Quarterly':
+						nextDueAt.add(3, 'months');
+						break;
+					case 'Annually':
+						nextDueAt.add(1, 'years');
+						break;
+					default:
+						console.log('Unknown frequency: ', this.data.frequency);
+				}
+				this.data.set('dueAt', nextDueAt.format('YYYY-MM-DD'));
+				this.emit('close');
+				taskHistory.show();
+	#cancel[btn] 'Cancel'
+		events:
+			click:
+				this.emit('close');
+	#show:function
+		this.modal.show();	
+	#init:function
+		this.modal = Modal.createModal(this);
+		hub.on('filterChanged', () => { this.update(hub.filter.selected); });
+		this.completedBy.update(employees);
+	#render:function
+
+
+TaskHistory
+	#header:SimpleHeader({ text: 'Task History', close: true })
+		events:
+			close:
+				this.modal.hide();
+	#list:List({ ctor: 'TaskHistoryItem', sort: 'completedAt', direction: 'reverse' })$(update=data.history)[list]
+	#show:function
+		this.modal.show();	
+	#init:function
+		this.modal = Modal.createModal(this);
+		this.modal.mainView.style.maxWidth = '90%';
+		hub.on('filterChanged', () => { this.update(hub.filter.selected); });
+
+TaskHistoryItem[item row row-flex tight]
+	#completedAt[row-nofill]
+		style:
+			width: 16em;
+	#completedBy$(data.completedBy)[row-nofill]
+		style:
+			width: 12em;
+	#note$(data.note)[row-fill]
+	#init:function
+	#render:function
+		var completedAt = moment(this.data.completedAt);
+		this.completedAt.innerHTML = completedAt.format('MMM Do YYYY, hh:mma dddd');
+
+
+EditCategories
+	#header:SimpleHeader({ text: 'Edit Categories', add: true, close: true })
+		events:
+			add:
+				var item = {
+					key: SyncNode.guidShort(),
+					name: '',
+					createdAt: new Date().toISOString()
+				};
+				this.data.set(item.key, item);
+				hub.selectCategory(item.key);
+				editCategory.show();
+			close:
+				this.modal.hide();
+	#list:List({ ctor: 'CategoryListItem', sort: 'name' })$(update=data)[list]
+	#show:function
+		this.modal.show();	
+	#init:function
+		this.modal = Modal.createModal(this);
+
+CategoryListItem[item]
+	:events
+		click:
+			hub.selectCategory(this.data.key);
+			editCategory.show();
+	#name$(data.name)
+
+EditCategory
+	#header:SimpleHeader({ text: 'Edit Category', del: true, close: true })
+		events:
+			close:
+				this.modal.hide();
+			delete:
+				Modal.confirm('Delete Category?', this.data.name,  () => {
+					this.data.parent.remove(this.data.key);
+					this.emit('close');
+				});
+	#title:Input({ label: 'Name', prop: 'name' })$(update=data)
+	#show:function
+		this.modal.show();	
+	#init:function
+		this.modal = Modal.createModal(this);
+		hub.on('filterChanged', () => { this.update(hub.filter.selectedCategory); });
+
+
+</script>
+
+
+
+<script>
+"use strict"
+
+
+SV.startReloader();
+
+var sync = new SyncNodeSocket('/data', {});
+window.List = List;
+window.Input = Input;
+window.SimpleEditSelect = SimpleEditSelect;
+
+var employees = ['Johnny Lingerfelt', 'Josh Miller', 'Jeff Jones', 'Wade Childress', 'Tim Jeffords', 'Doreen Grove', 'Justin Kalweit', 'Bob Kalweit', 'Ashleigh Miller', 'Ronald Charles', 'Jeff Gregory'].sort();
+
+SV.onLoad(() => { 
+		SyncViewML.importCode('components'); 
+		SyncViewML.parse(SV.id('views').innerHTML); 
+		sync.on('updated', (data) => {
+			console.log('data', data);
+			if(!data.tasks) { 
+				data.set('tasks', {
+							recurring: {},
+							categories: {}
+						});
+			}
+			hub.update(data);
+		});
+});
+
+
+
+
+</script>
+</body>
+</html>

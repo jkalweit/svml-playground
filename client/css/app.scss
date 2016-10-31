@@ -1,0 +1,512 @@
+@import 'palette';
+
+$typeGrid: 4px;
+$margin: 16px;
+$increment: 56px;
+
+$color-light: palette(Teal, 200);
+$color-primary: palette(Teal, 500);
+$color-dark: palette(Teal, 900);
+$color-secondary-light: palette(Deep Purple, 200);
+$color-secondary-medium: palette(Deep Purple, 500);
+$color-secondary-dark: palette(Deep Purple, 900);
+
+
+
+/** App specific **/
+
+
+
+
+/** Generic **/
+
+/*
+*,
+*::before,
+*::after {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+*/
+
+@mixin no-select {
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.test {
+	background-color: #FFD;
+	border: 1px solid #000;
+}
+
+
+.group {
+	&:after {
+		content: "";
+		display: table;
+		clear: both;
+	}
+}
+
+.no-overflow {
+	overflow: hidden;
+}
+
+body, input {
+	color: rgba(0,0,0,0.87);
+	font: 16px sans-serif;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	background-color: #555;
+}
+
+.touch {
+	width: $increment;
+	height: $increment;
+	line-height: $increment;
+	text-align: center;
+	transition: all 0.2s;
+
+	.tight & {
+		width: $increment/2;
+		height: $increment/2;
+		line-height: $increment/2;
+		font-size: 16px;
+	}
+}	
+.touch:hover {
+	color: rgba(0,0,0,0.5);
+
+	&.highlight {
+		color: rgba(255,255,0,0.7);
+	}
+}
+
+
+
+$col-width: 5 * $increment;
+$header-height: $increment;
+$footer-height: $increment;
+
+.col { 
+	box-sizing: border-box;
+	float: left; 
+	height: calc(100% - #{$header-height});
+	overflow-y: hidden;
+	width: $col-width; 
+	border-right: 1px solid rgba(0,0,0,0.5); 
+	background-color: #FFF;
+	position: relative;
+
+	&.wide {
+		width: $increment * 7;
+	}
+}
+
+
+.header { 
+	flex: 0 0 auto;
+	height: $header-height; 
+	line-height: $header-height; 
+	padding-left: $margin;
+	font-weight: bold;
+	@include no-select;
+	&.tight {
+		min-height: $increment/2;
+		height: auto; 
+		line-height: $header-height/2;
+	}
+}	
+
+.footer { 
+	flex: 1 1 auto;
+	height: $footer-height; 
+	line-height: $footer-height; 
+	bottom: 0; 
+	padding-left: $margin;
+	background-color: $color-primary;
+	color: #FFF;
+}
+
+.main-header {
+	height: $header-height; 
+	line-height: $header-height; 
+	box-sizing: border-box;
+}
+
+
+.label-set {
+	height: $increment;
+	line-height: $increment;
+	//width: 100%;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: row;
+
+	.label {
+		box-sizing: border-box;
+		width: 125px;
+		flex: 0 0 auto;
+		padding: $typeGrid $margin $typeGrid $margin;
+		display: inline-block;
+	}
+	input, textarea, select, .value {
+		box-sizing: border-box;
+		flex: 1 1 auto;
+		margin: $typeGrid $margin;
+		padding-left: $typeGrid;
+		padding-right: $typeGrid;
+		width: 100%;
+	}
+	
+
+	&.number input, 
+	&.number select, 
+	&.number .value {
+		text-align: right;
+	}
+}
+
+.list {
+	overflow-x: hidden;
+	overflow-y: auto;
+	@include no-select;
+
+	.item {
+		box-sizing: padding-box;
+		border-bottom: 1px solid rgba(0,0,0,0.5);
+		min-height: $increment;
+		line-height: $increment;
+		padding-left: $margin;
+
+		&.tight {
+			min-height: $increment/2;
+			line-height: $increment/2;
+		}
+
+		&.super-tight {
+			min-height: $increment/4;
+			line-height: $increment/4;
+		}
+	}
+}
+
+
+@mixin h-base {
+	color: rgba(0,0,0,0.54);
+	margin-top: 2 * $typeGrid;
+	.dark > & {
+		color: #FFF;
+	}
+}
+
+
+@for $i from 1 through 6 {
+	h#{$i} {
+		font-size: #{32px - (($i - 1) * ($typeGrid + 1))};		
+		margin-bottom: #{(6 - $i) * $typeGrid};
+		@include h-base;
+	}
+}
+
+@for $i from 1 through 12 {
+	.width#{$i} {
+		display: inline-block;
+		width: #{$i * $increment};
+	}
+}
+
+@for $i from 1 through 6 {
+	.margin#{$i} {
+		margin-left: #{$margin*$i};
+	}
+	.margin#{$i}.right {
+		margin-left: 0;
+		margin-right: #{$margin*$i};
+	}
+
+	.padding#{$i} {
+		padding-left: #{$margin*$i};
+	}
+	.padding#{$i}.right {
+		padding-left: 0;
+		padding-right: #{$margin*$i};
+	}}
+
+.btn {
+	box-sizing: border-box;
+	height: $increment;
+	line-height: $increment;
+	border-radius: 4px;
+	font-weight: bold;
+	color: #FFF;
+	background-color: #2196F3;
+	margin: $typeGrid $margin $typeGrid $margin;
+	text-align: center;
+	@include no-select;
+	&.disabled {
+			background-color: #999;
+	}
+}
+
+
+.modal {
+	display: none;
+	z-index: 2;
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 100vw;
+	height: 100vh;
+	background-color: rgba(0,0,0,0.7);
+	padding: 1em;
+	overflow-y: scroll;
+
+	.btn {
+		margin-left: 0;
+		margin-right: 0;
+	}
+
+	.header {
+		padding-left: 0;
+	}
+}
+
+.modal .main-view {
+	width: 100%;
+	max-width: 600px;
+	min-width: 300px;
+	box-shadow: 3px 3px 3px #000;
+	box-sizing: border-box;
+	padding: 2em;
+	margin: auto auto;
+	background-color: #FFF;
+}
+
+.modal .footer {
+	margin-top: 1em;
+	overflow: hidden;
+}
+
+$input-height: $increment - $margin;
+
+
+.row {
+	min-height: $increment;
+	line-height: $increment; 
+	box-sizing: border-box;
+
+	input, select {
+    		height: $input-height;
+		padding-left: $typeGrid;
+		margin-left: $margin - $typeGrid*2;
+		margin-top: $margin/2;
+		margin-bottom: $margin/2;
+	}
+	
+	&.tight {
+		min-height: $increment/2;
+		line-height: $header-height/2;
+	}
+}
+
+.row-flex {
+	display: flex;	
+	flex-direction: row;
+}
+.row-right {
+	float: right;
+}
+.row-fill {
+	flex: 1 1 auto;
+	width: 100%;
+}
+.row-nofill {
+	flex: 0 0 auto;
+}
+
+
+.col-flex {
+	display: flex;	
+	flex-direction: column;
+}
+.col-left {
+	float: left;	
+	box-sizing: border-box;
+	border-right: 1px solid rgba(0,0,0,0.5); 
+	background-color: #FFF;
+}
+.col-right {
+	float: right;
+	border-right: none; 
+	border-left: 1px solid rgba(0,0,0,0.5); 
+}
+.col-fill {
+	flex: 1 1 auto;
+	overflow-x: hidden;
+	overflow-y: hidden;
+}
+.col-nofill {
+	flex: 0 0 auto;
+}
+
+.scroll-x { overflow-x: auto; }
+.scroll-y { overflow-y: auto; }
+
+.shadow {
+	box-shadow: 0px 2px 3px rgba(0,0,0,.5);
+}
+
+.bold {
+	//color: rgba(0,0,0,0.87);
+	font-weight: bold;
+}
+.italic {
+	font-style: italic;
+}
+.whitespace-pre {
+	white-space: pre;
+}
+
+.small-text {
+	font-size: 12px;
+}
+.light-text {
+	color: rgba(0,0,0,0.5);
+}
+
+.right {
+	float: right;
+}
+.left {
+	float: left;
+}
+
+.black {
+	background-color: #000;
+	color: rgba(255,255,255,0.87);
+
+	.touch:hover {
+		color: rgba(255,255,0,0.7);
+	}
+}
+.dark {
+	background-color: $color-dark;
+	color: rgba(255,255,255, 1);
+	
+	&.disabled {
+		color: rgba(255,255,255,0.5);
+	}
+
+	.highlight {
+		color: rgba(255, 255, 0, 1);
+	}
+}
+.medium {
+	background-color: $color-primary;
+	color: rgba(255,255,255,0.87);
+}
+.light {
+	background-color: $color-light;
+	color: #000;
+}
+.secondary-dark {
+	background-color: $color-secondary-dark;
+	color: rgba(255,255,255, 1);
+	
+	&.disabled {
+		color: rgba(255,255,255,0.5);
+	}
+
+	.highlight {
+		color: rgba(255, 255, 0, 1);
+	}
+}
+.secondary-medium {
+	background-color: $color-secondary-medium;
+	color: rgba(255,255,255,0.87);
+}
+.secondary-light {
+	background-color: $color-secondary-light;
+	color: #FFF;
+}
+.error {
+	background-color: palette(Red, 600);
+	color: rgba(255, 255, 255, 1);
+}
+.warning {
+	background-color: palette(Yellow, 600);
+	color: rgba(0,0,0, 1);
+}
+.ok {
+	background-color: palette(Green, 600);
+	color: rgba(255, 255, 255, 1);
+}
+.selected {
+	background-color: rgba(255, 255, 155, 0.7);
+}
+.border-bottom {
+	border-bottom: 1px solid rgba(0,0,0,0.35);
+}
+.highlight {
+	color: rgba(255, 255, 0, 1);
+}
+.glow {
+	box-shadow: 0px 0px 10px #FF0;
+}
+.disabled {
+	//background-color: palette(Grey, 300);
+	color: rgba(0, 0, 0, 0.5);
+}
+.flex { display: flex; }
+.hide { display: none; }
+.invisible { opacity: 0; }
+
+.blink {
+	animation: blinker 1s linear infinite;
+}
+
+@keyframes blinker {  
+    50% { opacity: 0.0; }
+}
+
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/imgs/fonts/MaterialIcons-Regular.eot); /* For IE6-8 */
+  src: local('Material Icons'),
+       local('MaterialIcons-Regular'),
+       url(/imgs/fonts/MaterialIcons-Regular.woff2) format('woff2'),
+       url(/imgs/fonts/MaterialIcons-Regular.woff) format('woff'),
+       url(/imgs/fonts/MMaterialIcons-Regular.ttf) format('truetype');
+}
+
+.material-icons {
+	font-family: 'Material Icons';
+	font-weight: normal;
+	font-style: normal;
+	font-size: 24px;
+	//line-height: 1;
+	letter-spacing: normal;
+	text-transform: none;
+	//display: inline-block;
+	white-space: nowrap;
+	word-wrap: normal;
+	direction: ltr;
+	-webkit-font-feature-settings: 'liga';
+	-webkit-font-smoothing: antialiased;
+	font-feature-settings: 'liga';
+	font-smoothing: antialiased;
+}
+
+
+
+

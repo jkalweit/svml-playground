@@ -4,12 +4,15 @@
 
 
 class SyncView {
-	constructor(content) {
-		if(content instanceof HTMLElement) {
-			this.node = content;
-		} else {
-			this.node = SV.el('div', { innerHTML: content || ''});
-		}
+	constructor(options) {
+		//if(content instanceof HTMLElement) {
+		//	this.node = content;
+		//} else {
+		//	this.node = SV.el('div', { innerHTML: content || ''});
+		//}
+		
+		options = options || {};
+		this.node = SV.el(options.elem ? options.elem : 'div', { innerHTML: options.content || ''});
 		this.eventHandlers = {};
 		this.bindings = {};
 	}
@@ -38,10 +41,10 @@ class SyncView {
 	bind() {
 
 		function traverse(curr, pathArr) {
-			if(pathArr.length === 0) return curr;	
+			if(pathArr.length === 0) return curr;
 			else {
 				var next = pathArr.shift();
-				if(curr == null || !curr.hasOwnProperty(next)) return null;
+				if(curr == null || !(next in curr)) return null;
 				return traverse(curr[next], pathArr);  
 			}
 		}
@@ -51,10 +54,16 @@ class SyncView {
 			Object.keys(props).forEach((prop) => { 
 				var valuePath = props[prop];
 				var value = traverse(this, valuePath.split('.'));
-				if(prop === 'update') {
-					this[id].update(value);
+				var target = this[id];	
+				var propSplit = prop.split('.');
+				if(propSplit.length > 1) {
+						prop = propSplit.pop();
+						target = traverse(target, propSplit);
+				}
+				if(typeof target[prop] === 'function') {
+					target[prop](value);
 				} else {
-					this[id][prop] = value;
+					target[prop] = value;
 				}
 			});
 		});	

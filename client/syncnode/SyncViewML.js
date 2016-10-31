@@ -3,7 +3,6 @@
 
 class SyncViewML {
 
-
 		static isCapitalized(str) { return str[0] === str[0].toUpperCase(); } 
 
 		static numTabs(str) {
@@ -95,15 +94,18 @@ class SyncViewML {
 										inComponent = true;
 										var componentName = SyncViewML.getName(line);
 										var classes = SyncViewML.getClasses(line);
+										var args = SyncViewML.getArgs(line);
+										var options = SyncViewML.getOptions(trimmed);
+										options.elem = options.elem || 'div';
 										currComponent = {
-name: componentName,
-	  classes: classes,
-	  ctor: new Function(`
-					  this.node = SV.el('div');
-					  this.eventHandlers = {};
-					  this.bindings = {};
-					  `),
-	  code: ''
+											name: componentName,
+											classes: classes,
+											ctor: new Function(`
+												this.node = SV.el('${options.elem}');
+												this.eventHandlers = {};
+												this.bindings = {};
+											`),
+											code: ''
 										};
 
 										currComponent.ctor.prototype = Object.create(SyncView.prototype);
@@ -171,6 +173,7 @@ name: componentName,
 				if(typeof componentName === 'function') {
 						//args.unshift(null);
 						var instance = new (Function.prototype.bind.call(componentName, this, options));
+						instance.svml = this;
 						return instance;
 				}
 
@@ -185,6 +188,7 @@ name: componentName,
 								return;
 						}
 						var instance = new (Function.prototype.bind.call(ctor, this, options));
+						instance.svml = this;
 						if(instance.init) instance.init();
 						return instance;
 				}
@@ -206,7 +210,30 @@ name: componentName,
 										var classes = SyncViewML.getClasses(trimmed);
 										var inner = SyncViewML.getText(trimmed);
 										var displayName = componentName + ':' + id + ':' + tag; // for debugger	
-										if(binding) { 
+										//console.log('Display Name: ', displayName);
+										if(trimmed === 'events:') {
+												var code = SyncViewML.getCode(trimmed);
+												while(i+1 < lines.length && SyncViewML.numTabs(lines[i+1]) > 1) {
+														i = i+1;
+														code += lines[i] + '\n';
+												}
+												SyncViewML.parseEvents(code, componentInstance.node, componentInstance, 1, displayName);
+
+										} else if(trimmed === 'style:') {
+												var style = SyncViewML.getCode(trimmed);
+												while(i+1 < lines.length && SyncViewML.numTabs(lines[i+1]) > 1) {
+														i = i+1;
+														style += lines[i] + '\n';
+												}
+												style.replace('\n', ' ');
+												var styleArr = style.split(';');
+												styleArr.forEach((item) => {
+																if(item === '') return;
+																var pair = item.split(':');
+																pair = pair.map((s) => s.trim());
+																componentInstance.node.style[pair[0]] = pair[1];
+																});
+										} else if(binding) { 
 												var split = binding.split('=');
 												var prop = 'innerHTML';
 												var value = split[0];
@@ -236,28 +263,6 @@ name: componentName,
 												Object.defineProperty(el, 'name', { value: displayName });
 												el.displayName = displayName;
 												//if(id === 'init') console.log('code', id, args, code);
-										} else if(tag === 'events') {
-												var code = SyncViewML.getCode(trimmed);
-												while(i+1 < lines.length && SyncViewML.numTabs(lines[i+1]) > 1) {
-														i = i+1;
-														code += lines[i] + '\n';
-												}
-												SyncViewML.parseEvents(code, componentInstance.node, componentInstance, 1, displayName);
-
-										} else if(tag === 'style') {
-												var style = SyncViewML.getCode(trimmed);
-												while(i+1 < lines.length && SyncViewML.numTabs(lines[i+1]) > 1) {
-														i = i+1;
-														style += lines[i] + '\n';
-												}
-												style.replace('\n', ' ');
-												var styleArr = style.split(';');
-												styleArr.forEach((item) => {
-																if(item === '') return;
-																var pair = item.split(':');
-																pair = pair.map((s) => s.trim());
-																componentInstance.node.style[pair[0]] = pair[1];
-																});
 										} else {
 
 												el = SV.el(tag, { 
@@ -315,7 +320,7 @@ if(id) componentInstance[id] = el;
 }
 
 if(componentInstance.init) componentInstance.init.call(componentInstance, options);
-
+componentInstance.svml = this;
 return componentInstance;
 }
 
@@ -354,7 +359,7 @@ static parseEvents(code, el, context, tabsBase, displayName) {
 
 class List extends SyncView {
 		constructor(options) {
-				super();
+				super(options);
 				this.views = {};
 				this.ctor = options.ctor;
 				this.sort = options.sort;
@@ -367,7 +372,7 @@ class List extends SyncView {
 				itemsArr.forEach((item) => {
 								var view  = this.views[item.key];
 								if(!view) {
-								view = SyncViewML.buildComponent(this.ctor);
+								view = this.svml.buildComponent(this.ctor);
 								this.views[item.key] = view;
 								view.update(item);
 								this.emit('viewAdded', view);
@@ -474,7 +479,6 @@ class Input extends SyncView {
 	}
 	static DateParser(val) {
 		if(val.trim() == '') return null;
-		console.log('value here', val);
 		return moment(val, 'MM/DD/YYYY hh:mma').toISOString();
 	}
 }

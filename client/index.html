@@ -27,7 +27,11 @@ MainView[row-flex]
 
 
 Editor[row-fill]
+	style:
+		margin: 8px;
 	#title:h2 'Editor'
+		style:
+			color: #FFF;
 	#code:textarea$(data.code)
 		style:
 			width: 100%;
@@ -49,13 +53,15 @@ Editor[row-fill]
 				}
 				if(e.ctrlKey && e.keyCode === 83) {
 					e.preventDefault();
-					this.data.set('code', this.code.value);
+					this.saveCode();
 					return false;
 				}
+	#saveCode:function
+		this.data.set('code', this.code.value);
 	#dataEditor:textarea
 		style:
 			width: 100%;
-			height: 25em;
+			height: 15em;
 			tab-size: 4;
 		events:
 			keydown:function(e)
@@ -72,38 +78,86 @@ Editor[row-fill]
 					return false;	
 				}
 				if(e.ctrlKey && e.keyCode === 83) {
-					console.log('here');
 					e.preventDefault();
-					try {
-						eval('var data = ' + this.dataEditor.value);
-						data.version = SyncNode.guidShort();
-						console.log('datdddddda', data);
-						this.data.merge({
-							__remove: 'data',
-							data: data
-						});
-					} catch (e) {
-						console.log('Could not parse data.');
-					}
+					this.saveData();
 					return false;
 				}
+	#saveData:function
+		try {
+			eval('var data = ' + this.dataEditor.value);
+			data.version = SyncNode.guidShort();
+			console.log('datdddddda', data);
+			this.data.merge({
+				__remove: 'data',
+				data: data
+			});
+		} catch (e) {
+			console.log('Could not parse data.');
+		}
+
+	#saveAndUpdatePreview:button 'Save & Preview (ctl-s)'
+		events:
+			click:
+				this.saveCode();
+				this.saveData();
+	#saveToBasic:button 'Save to Basic'
+		style:
+			display: none;
+		events:
+			click:
+				this.data.examples.merge({
+					__remove: 'basic',
+					basic: {
+						code: this.data.code,
+						data: this.data.data
+					}
+				});
+	#saveToComplete:button 'Save to Complete'
+		style:
+			display: none;
+		events:
+			click:
+				this.data.examples.merge({
+					__remove: 'complete',
+					complete: {
+						code: this.data.code,
+						data: this.data.data
+					}
+				});
+	#loadBasic:button 'Load Basic Example'
+		events:
+			click:
+				this.data.merge({
+					__remove: ['code', 'data'],
+					code: this.data.examples.basic.code,
+					data: this.data.examples.basic.data
+				});
+	#loadComplete:button 'Load Complete Example'
+		events:
+			click:
+				this.data.merge({
+					__remove: ['code', 'data'],
+					code: this.data.examples.complete.code,
+					data: this.data.examples.complete.data
+				});
 	#init:function
 		this.code.setAttribute('spellcheck', false);
 		this.dataEditor.setAttribute('spellcheck', false);
 	#render:function
-		console.log('this.data.data', this.data.data);
 		var asString = typeof this.data.data === 'string' ? this.data.data : JSON.stringify(this.data.data, null, "\t");
-		console.log('as string', asString);
 		this.dataEditor.value = asString;
 	
 	
 Preview[row-fill]
+	style:
+		margin: 8px;
 	#title:h2 'Preview'
+		style:
+			color: #FFF;
 	#preview
 		style:
 			background-color: #FFF;
 			border: 1px solid #000;
-			margin: 8px;
 	#render:function
 		this.preview.innerHTML = '';
 		var svml2 = new SyncViewML();
@@ -115,14 +169,17 @@ Preview[row-fill]
 			} else {
 				data = this.data.data;
 			}
-			var sync = new SyncNode(data);
-			sync.on('updated', (updated) => {
-				this.data.set('data', updated);
-			});
-			svml2.instances.mainView.update(sync);
 		} catch (e) {
-			console.log('Could not parse data2.');
+			console.log('Could not parse data.');
 		}
+		var sync = new SyncNode(data);
+		sync.on('updated', (updated) => {
+			this.data.merge({
+				__remove: 'data',
+				data: updated
+			});
+		});
+		svml2.instances.mainView.update(sync);
 		
 
 </script>
@@ -144,7 +201,6 @@ SV.onLoad(() => {
 		svml.importCode('components'); 
 		svml.parse(SV.id('views').innerHTML); 
 		sync.on('updated', (data) => {
-			console.log('data', data);
 			svml.instances.mainView.update(data, true);
 		});
 });

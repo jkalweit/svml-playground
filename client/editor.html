@@ -23,13 +23,176 @@
 <div id="editor">
 #mainView:MainView
 </div>
+
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.2/require.min.js" type="text/javascript" charset="utf-8"></script>
     
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ace.js" type="text/javascript" charset="utf-8"></script>
+
+
+<script>
+
+define(function(require, exports, module) {
+"use strict";
+
+    var oop = require("../lib/oop");
+    var TextHighlightRules = require("./text_highlight_rules").TextHighlightRules;
+    var CssHighlightRules = require("./css_highlight_rules").CssHighlightRules;
+    var JavaScriptHighlightRules = require("./javascript_highlight_rules").JavaScriptHighlightRules;
+
+
+    oop.inherits(CoffeeHighlightRules, TextHighlightRules);
+
+    function CoffeeHighlightRules() {
+        
+        var commentRule = {
+            token: "comment",
+            regex: /(\/\/.*)/
+        };
+        
+        var eventsRule = {
+            token: "keyword.events",
+            regex: /\tevents:/,
+            next: function(state, stack) {
+                console.log('entering events');
+                return "events";
+            }
+        };
+        
+        this.$rules = {
+            start: [
+                {
+                    token: ["keyword", "variable"],
+                    regex: /(#)(\w*)/,
+                    next: "tag"
+                }, 
+                commentRule, 
+                {
+                    token: "entity",
+                    regex: /(^[A-Z].*)/,
+                    next: "component"
+                }
+            ],
+            tag: [
+                {
+                    token: function(first, second) {
+                        return ["keyword", "entity"];
+                    },
+                    regex: /(:)([^\s]+)/
+                },
+                {
+                    token: "string",
+                    regex: /('.*')/,
+                    next: "start"
+                }, 
+                {
+                    token: "string",
+                    regex: /($)/,
+                    next: "start"
+                }
+            ],
+            component: [
+                {
+                    token: "keyword.style",
+                    regex: /\tstyle:/,
+                    next: function(state, stack) {
+                        console.log('entering style');
+                        return "css-start";
+                    }
+                }, 
+                eventsRule, 
+                commentRule,
+                {
+                    token: ["keyword", "variable"],
+                    regex: /\t(#)(\w*)/,
+                    next: function(state, stack) {
+                        console.log('component entering tag');
+                        return "tag";
+                    }
+                },
+                {
+                    token: "keyword.endcomponent",
+                    regex: /^\s*$/,
+                    next: function(state, stack) {
+                        console.log('exiting component for start');
+                        return "start";
+                    }
+                }
+            ],
+            events: [
+                {
+                    token: "keyword.events.click",
+                    regex: /\t\tclick:/,
+                    next: "js-start"
+                },
+                {
+                    token: "keyword.events.hover",
+                    regex: /\t\thover:/,
+                    next: "js-start"
+                }, 
+                {
+                    token : "keyword.events.end",
+                    regex: /^\s*$/,
+                    next  : "component"
+                },
+                commentRule
+            ],
+            dummmy: [
+                {
+                    token: function(first) {
+                        console.log('here', first)
+                        return "string";
+                    },
+                    regex: /()/
+                }
+            ]
+        };
+        
+        this.embedRules(CssHighlightRules, "css-", [
+            {
+                token : "keyword.endcss",
+                regex: /^\s*$/,
+                next: function(state, stack) {
+                    console.log('exiting css for component');
+                    return "component";
+                }
+            },
+            eventsRule
+        ]);
+        
+        this.embedRules(JavaScriptHighlightRules, "js-", [
+            {
+                token : "keyword.endjavascript",
+                regex: /^\s*$/,
+                next  : "events"
+            },
+            {
+                    token: "keyword.events.hover",
+                    regex: /\t\thover:/,
+                    next: "js-start"
+            }
+        ]);
+    }
+
+    exports.CoffeeHighlightRules = CoffeeHighlightRules;
+});
+
+
+
+
+</script>
+
+
+
 <script>
     var editor = ace.edit("editor");
-    editor.setTheme("ace/theme/monokai");
+    editor.setTheme("ace/theme/cobalt");
     editor.getSession().setMode("ace/mode/javascript");
 </script>
+
+
 
 <script>
 "use strict"

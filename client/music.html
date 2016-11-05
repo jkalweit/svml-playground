@@ -1,0 +1,146 @@
+<htme>
+<head>
+<link rel="stylesheet" type="text/css" href="/css/app.css">
+<link rel="import" id="components" href="/components.html">
+<script type="text/javascript" src="https://www.youtube.com/iframe_api"></script>
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNode.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/syncnode/SyncView.js"></script>
+<script type="text/javascript" src="/syncnode/SyncViewML.js"></script>
+</head>
+<body>
+
+
+<script id="views" type="text/syncviewml">
+
+#mainView:MainView
+
+MainView
+	:style
+		padding: 8px;
+		background-color: #DDD;
+	#title:h1 'Music'
+	#playerLeftDiv
+	#playerRightDiv
+	:button 'Fade Left'
+		events:
+			click:
+				this.fade(this.playerRight, this.playerLeft);
+	:button 'Fade Right'
+		events:
+			click:
+				this.fade(this.playerLeft, this.playerRight);
+	#queue:Queue $(update=data.music.queue)
+	#playLeft:function(id)
+		this.play(id, this.playerLeft);
+	#playRight:function(id)
+		this.play(id, this.playerRight);
+	#play:function(id, player);
+		player.setVolume(0);		
+		player.loadVideoById(id);
+	#fade:function(from, to)
+		console.log('here1');
+		var volFrom = 100;
+		var volTo = 0;
+		function fadeHelper() {
+			console.log('here2', volFrom, volTo);
+			from.setVolume(volFrom);
+			to.setVolume(volTo);
+			if(volFrom > 0) {
+				volFrom -= 5;
+				volTo += 5;
+				setTimeout(() => {
+					fadeHelper();			
+				}, 200);
+			}
+		}
+		fadeHelper();
+		
+		
+	#init:function
+		this.playerLeft = new YT.Player(this.playerLeftDiv, {
+			height: '200',
+			width: '300',
+			videoId: '',
+			events: {}
+		});
+		this.playerRight = new YT.Player(this.playerRightDiv, {
+			height: '200',
+			width: '300',
+			videoId: ''
+		});
+	#render:function
+
+
+
+
+			
+
+Queue
+	style:
+		width: 50%;
+	#input:input
+	#addBtn:button 'Request'
+		events:
+			click:
+				var item = {
+					key: SyncNode.guidShort(),
+					createdAt: new Date().toISOString(),
+					id: this.input.value
+				};
+				this.data.set(item.key, item);	
+	#list:List({ ctor: 'QueueItem' })[list]
+	#render:function
+		this.list.update(this.data);
+
+QueueItem[item row row-flex tight]
+	#id[row-nofill] $(data.id)
+	#title[row-fill]
+	#playLeft:button[row-nofill] 'Left'
+		events:
+			click:
+				svml.instances.mainView.playLeft(this.data.id);
+	#playRight:button[row-nofill] 'Right'
+		events:
+			click:
+				svml.instances.mainView.playRight(this.data.id);
+	#remove:button[row-nofill] 'x'
+		events:
+			click:
+				this.data.parent.remove(this.data.key);
+	
+	
+
+</script>
+
+
+
+<script>
+"use strict"
+
+
+SV.startReloader();
+
+var sync = new SyncNodeSocket('/data', {});
+window.List = List;
+window.Input = Input;
+
+var svml = new SyncViewML();
+SV.onLoad(() => { 
+		svml.importCode('components'); 
+		svml.parse(SV.id('views').innerHTML); 
+		sync.on('updated', (data) => {
+			if(!data.music) {
+					data.set('music', { queue: {} });
+			}
+			svml.instances.mainView.update(data);
+		});
+});
+
+
+
+
+</script>
+</body>
+</html>

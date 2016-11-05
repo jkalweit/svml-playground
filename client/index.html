@@ -23,7 +23,7 @@ MainView[row-flex]
 	#preview:Preview
 	#render:function
 		this.editor.update(this.data);
-		this.preview.update(this.data, true);
+		this.preview.update(this.data);
 
 
 Editor[row-fill]
@@ -201,7 +201,7 @@ SV.onLoad(() => {
 		svml.importCode('components'); 
 		svml.parse(SV.id('views').innerHTML); 
 		sync.on('updated', (data) => {
-			svml.instances.mainView.update(data, true);
+			svml.instances.mainView.update(data);
 		});
 });
 

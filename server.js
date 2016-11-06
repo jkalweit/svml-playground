@@ -5,13 +5,15 @@ var express = require('express');
 var socketio = require('socket.io');
 var fs = require('fs');
 var Sync = require('./syncnode/SyncNodeServer.js');
-
+var google = require('googleapis');
+var util = require('util');
 
 var app = express();
 var server = http.createServer(app);
 var io = socketio.listen(server);
 
 
+var config = JSON.parse(fs.readFileSync('../private/config.json'));
 
 
 app.use(function (req, res, next) {
@@ -31,11 +33,40 @@ var syncServer = new Sync(io, { namespace: 'data', dataDirectory: '../private' }
 app.use('/', express.static('client/'));
 
 
+var youtube = google.youtube({
+	version: 'v3',
+	auth: config.google.apiKey
+});
+//var auth = Youtube.authenticate({
+//	type: "key",
+//	key: config.google.apiKey
+//});
+
+
+console.log('Testing2', youtube.search.list);
 
 
 io.on('connection', (socket) => {
-	socket.on('do something', (msg) => {	
-		console.log('do something special because sockets!');
+	socket.on('get video info', (item) => {	
+		console.log('get video info:', item);
+
+		youtube.search.list({
+			part: 'id,snippet',
+			q: item.id,
+			maxResults: 1
+		}, function(err, data) {
+			if (err) {
+		    	console.error('Error: ' + err);
+		    }
+		    if (data) {
+		    	console.log(util.inspect(data, true, 5));
+				item.info = {
+					title: data.items[0].snippet.title,
+					description: data.items[0].snippet.description 
+				};
+				io.emit('get video info result', item);
+		    }	
+		});
 	});
 });
 

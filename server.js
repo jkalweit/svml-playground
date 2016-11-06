@@ -43,8 +43,6 @@ var youtube = google.youtube({
 //});
 
 
-console.log('Testing2', youtube.search.list);
-
 
 io.on('connection', (socket) => {
 	socket.on('get video info', (item) => {	

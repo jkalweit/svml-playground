@@ -9,7 +9,7 @@
 <script type="text/javascript" src="/syncnode/SyncView.js"></script>
 <script type="text/javascript" src="/syncnode/SyncViewML.js"></script>
 </head>
-<body>
+<body style="background-color: #444; padding: 1em;">
 
 
 <script id="views" type="text/syncviewml">
@@ -22,8 +22,10 @@
 MainView
 	:style
 		padding: 8px;
-		background-color: #DDD;
+		background-color: #FFF;
 	#title:h1 'Music'
+		style:
+			color: #FFF;
 	#playerLeftDiv
 	#playerRightDiv
 	:hr
@@ -122,7 +124,6 @@ Queue
 			svml.instances.requestSubmit.update(item);
 			svml.instances.requestSubmit.show();
 		});
-		console.log('subscribed', io);
 	#render:function
 		this.list.update(this.data);
 
@@ -143,6 +144,7 @@ QueueItem[item row row-flex tight]
 	#title[row-fill] $(data.info.title)
 		style:
 			padding-left: 8px;
+			color: #BBB;
 
 
 RequestSubmit

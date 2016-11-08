@@ -1,0 +1,191 @@
+<htme>
+<head>
+<link rel="stylesheet" type="text/css" href="/css/app.css">
+<link rel="import" id="components" href="/components.html">
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNode.js"></script>
+<script type="text/javascript" src="/syncnode/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/syncnode/SyncView.js"></script>
+<script type="text/javascript" src="/syncnode/SyncViewML.js"></script>
+
+<script src="/codemirror/codemirror.js"></script>
+<link rel="stylesheet" href="/codemirror/codemirror.css">
+<script src="/codemirror/css.js"></script>
+<script src="/codemirror/javascript.js"></script>
+<script src="/codemirror/svml.js"></script>
+<script src="/codemirror/vim.js"></script>
+
+<style>
+
+.CodeMirror {
+	width: 100%;
+	height: 100%;
+	border-right: 1px solid #000;
+}
+
+#editor {
+	position: absolute;
+	left: 0; 
+	top: 0;
+	bottom: 40%;
+	right: 50%;
+}
+#dataEditor {
+	position: absolute;
+	left: 0; 
+	top: 60%;
+	bottom: 0;
+	right: 50%;
+	border-top: 1px solid #666;
+}
+#preview {
+	position: absolute;
+	left: 50%; 
+	top: 0;
+	bottom: 0;
+	right: 0;
+	border-left: 1px solid #666;
+}
+
+</style>
+
+</head>
+<body style="background-color: #FFF;">
+
+<div id="editor"></div>
+<div id="dataEditor"></div>
+<div id="preview"></div>
+
+<script id="code" type="text/x-svml">// Use ctl-s to save changes and updated the preview. You can edit the JSON too.
+//NOTE: The number of tabs beginning each line matters to the parser.
+
+// Declare top level tag instances like this: #[id]:[tag|Component]
+// In this playground, the id must be 'mainView' to get data updates.
+#mainView:MainView
+
+// Component definitions start with an uppercase:
+MainView
+	// style is any valid css:
+	style:
+		padding: 8px;
+	#test:function(hello)
+		var tex = 4;
+	// declare children like this: #[id]:[tag] '[innerHTML]'
+	#title:h2 'Hello World'
+	// items without a ':tag' are automatically divs
+	#nameSetManually
+	// you can bind data to innerHTML like this (bindings are 1-way)
+	#nameAsBinding $(data.name)
+	// if you need more flexibility, then make another component:
+	#customComponent:ColorChangingText $(update=data.custom)
+	// render is called when the data version changes
+	#render:function
+		// any javascript is valid in a function, just remember to 
+		// insert enough tabs to keep it under the definition:
+		console.log('rendering', this.data);
+		this.nameSetManually.innerHTML = this.data.name;
+
+
+ColorChangingText
+	style:
+		margin: 32px;
+	#text
+	#blueBtn:button 'Blue'
+		events:
+			click:
+				this.data.set('color', '#00F');
+	#greenBtn:button 'Green'
+		events:
+			click:
+				this.data.set('color', '#0F0');
+	#render:function
+		this.text.innerHTML = this.data.text;
+		this.text.style.color = this.data.color;
+</script>
+
+
+
+
+<script>
+var editor = document.getElementById('editor');
+var dataEditor = document.getElementById('dataEditor');
+var preview = document.getElementById('preview');
+var cm = CodeMirror(editor, {
+	value: 'Loading...',
+	mode: "svml",
+	keyMap: "vim",
+	lineNumbers: true,
+	indentWithTabs: true
+});
+var cm2 = CodeMirror(dataEditor, {
+	value: 'Loading...',
+	mode: "javascript",
+	keyMap: "vim",
+	lineNumbers: true,
+	indentWithTabs: true
+});
+
+editor.addEventListener('keydown', (e) => {
+	if(e.ctrlKey && e.keyCode === 83) {
+		e.preventDefault();
+		sync.data.set('code', cm.getValue());
+		return false;
+	}
+});
+dataEditor.addEventListener('keydown', (e) => {
+	if(e.ctrlKey && e.keyCode === 83) {
+		console.log('save data...');
+		e.preventDefault();
+		try {
+			eval('var data = ' + cm2.getValue());
+			data.version = SyncNode.guidShort();
+			console.log('datdddddda', data);
+			console.log('data', sync.data);
+			sync.data.merge({
+				__remove: 'data',
+				data: data
+			});
+		} catch (e) {
+			console.log('Could not parse data.');
+		}
+		return false;
+	}
+});
+
+</script>
+
+
+
+<script>
+"use strict"
+
+
+SV.startReloader();
+
+var sync = new SyncNodeSocket('/data', {});
+window.List = List;
+window.Input = Input;
+
+var svml = new SyncViewML();
+SV.onLoad(() => { 
+		sync.on('updated', (data) => {
+			var code = data.code || '';
+			cm.setValue(code);
+			var dataStr = JSON.stringify(data.data || {}, null, '\t');
+			console.log('dataStr', dataStr);
+			cm2.setValue(dataStr);
+			var svmlPreview = new SyncViewML();
+			preview.innerHTML = '';
+			svmlPreview.parse(code, preview);
+			if(svmlPreview.instances.mainView) {
+				svmlPreview.instances.mainView.update(data.data || {});
+			}
+		});
+});
+
+
+
+
+</script>
+</body>
+</html>

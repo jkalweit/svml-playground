@@ -45,7 +45,8 @@ Select[label-set]
 			change:
 				this.selected = this.selectInput.value;
 				this.emit('selected', this.selected);
-	#init:function(options)
+	#init:function
+		options = this.options || {};
 		options = options || {};
 		this.prop = options.prop;
 		this.sort = options.sort;
@@ -79,8 +80,8 @@ DateInput[label-set]
 				this.emit('selected', this.dateInput.value);
 	#select:function(value)
 		this.dateInput.value = value;
-	#init:function(options)
-		options = options || {};
+	#init:function
+		options = this.options || {};
 		this.prop = options.prop;
 		if(options.label) this.text.innerHTML = options.label;
 		else this.text.style.display = 'none';
@@ -95,8 +96,8 @@ DateInput[label-set]
 LabeledValue[label-set]
 	#label[label]
 	#value[value]
-	#init:function(options)
-		this.options = options || {};
+	#init
+		this.options = this.options || {};
 		this.label.innerHTML = this.options.label;
 	#render:function
 		this.value.style.textAlign = this.options.number ? 'right' : 'left';
@@ -115,7 +116,8 @@ ToggleButton[btn]
 		click:
 			this.data.set(this.prop, !this.data.get(this.prop));
 			this.emit('changed', this.data.get(this.prop));
-	#init:function(options)
+	#init:function
+		options = this.options || {};
 		this.prop = options.prop;
 		this.trueText = options.trueText || 'Yes';
 		this.falseText = options.falseText || 'No';
@@ -151,7 +153,8 @@ SimpleHeader[header col-nofill row row-flex]
 		events:
 			click: 
 				this.emit('close');
-	#init:function(options) 
+	#init:function 
+		options = this.options || {};
 		this.setTitle(options.text);
 		if(!options.settings)
 			this.settings.style.display = 'none';	
@@ -188,7 +191,8 @@ SearchHeader[row row-flex]
 	#clear:function
 		this.searchBox.value = '';
 		this.emit('searchChanged', this.searchBox.value);
-	#init:function(options)
+	#init:function
+		options = this.options || {};
 		if(!options.addBtn) this.addBtn.style.display = 'none';
 		if(!options.clearBtn) this.clearBtn.style.display = 'none';
 		if(!options.searchBox) this.searchBox.style.display = 'none';
@@ -221,7 +225,8 @@ SearchList[col-flex]
 		if(this.postFilter) filtered = this.postFilter(filtered);
 		this.list.update(filtered);
 
-	#init:function(options)
+	#init:function
+		options = this.options || {};
 		this.searchProp = options.searchProp;
 		this.header.searchBox.style.display = options.searchBox ? 'inline-block' : 'none';
 		this.header.addBtn.style.display = options.addBtn ? 'inline-block' : 'none';
@@ -254,7 +259,8 @@ SearchList[col-flex]
 		this.updateSelected();
 	
 SimpleList[col-flex]
-	#init:function(options)
+	#init:function
+		options = this.options || {};
 		this.list = this.appendView(new List({ ctor: options.ctor, sort: options.sort, direction: options.direction }));
 		this.list.node.classList.add('col-fill');
 		this.list.node.classList.add('scroll-y');

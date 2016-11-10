@@ -61,6 +61,12 @@ MainView
 	#render:function
 		if(this.selectedItem) this.select(this.selectedItem.key);	
 		this.drawer.update(this.data);
+		this.first;
+		if(!this.first) {
+			this.first = true;
+			var c = SV.toArray(this.data.components)[0];
+			if(c) this.select(c.key);
+		}
 
 Drawer
 	style:
@@ -217,11 +223,16 @@ EditDetails[row row-flex]
 					code: this.data.defaults.code,
 					data: this.data.defaults.data
 				})
+	#keyBindings:Select({ values: ['default', 'vim'] })
+		events:
+			selected:function(val)
+				localSettings.set('keyMap', val);
 	#updateAdminMode:function
 		var adminMode = svml.instances.mainView.isAdminMode;
 		this.setDefault.style.display = adminMode ? 'inline-block' : 'none';
 		this.remove.style.display = adminMode ? 'inline-block' : 'none';
 		this.nameInput.node.style.display = adminMode ? 'inline-block' : 'none';
+		this.keyBindings.node.style.display = adminMode ? 'inline-block' : 'none';
 	#init:function
 		this.updateAdminMode();
 		svml.instances.mainView.on('adminModeChanged', () => {
@@ -243,13 +254,23 @@ Editor
 	#init:function
 		this.cm = CodeMirror(this.node, {
 			mode: "svml",
-			keyMap: "vim",
+			keyMap: localSettings.keyMap || 'default',
 			lineNumbers: true,
 			indentWithTabs: true
 		});
 		this.cm.save = () => {
 			this.doSave();
 		};
+		localSettings.on('updated', () => {
+			console.log('keymap', localSettings.keyMap);
+			if(localSettings.keyMap === 'vim') {
+				console.log('keymap vim');
+				this.cm.setOption('vimMode', true);
+			} else {
+				console.log('keymap default');
+				this.cm.setOption('vimMode', false);
+			}
+		});
 	#render:function
 		var cursor = this.cm.getCursor();
 		this.cm.setValue(this.data);
@@ -291,9 +312,11 @@ Preview
 SV.startReloader();
 
 var sync = new SyncNodeSocket('/data', {});
+window.localSettings = new LocalSyncNode('localSettings');	
 
 var svml = new SyncViewML();
 SV.onLoad(() => { 
+		svml.importCode('components'); 
 		svml.parse(SV.id('views').innerHTML); 
 
 		sync.on('updated', (data) => {

@@ -164,7 +164,6 @@ name: componentName,
 												if(addToContainer) {
 														container.appendChild(componentInstance.node);
 												}
-												console.log('adding', id);
 												this.instances[id] = componentInstance;
 										}
 										toInit.forEach((instance) => { instance.init(); });
@@ -189,7 +188,9 @@ name: componentName,
 
 				var component = this.components[componentName]; 
 				if(!component || component.builtin) {
-						var ctor = component.builtin || window[componentName];
+						var ctor;
+						if(component) ctor = component.builtin;
+						else ctor = window[componentName];
 						//args.unshift(null);
 						if(!ctor) {
 								console.error('Cannot find component:', componentName);
@@ -203,6 +204,7 @@ name: componentName,
 
 
 				var componentInstance = new component.ctor();
+				componentInstance.options = options;
 				componentInstance.node.className += (' ' + component.classes).trim();
 				var lines = component.code.split('\n');
 				var el;

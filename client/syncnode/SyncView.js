@@ -35,7 +35,7 @@ class SyncView {
 			if(this.doFlash) this.flash(); 
 		}
 		else {
-			if(this.name) console.log(this.name + ' DATA NO CHANGED', this, this.data, data);
+			//if(this.name) console.log(this.name + ' DATA NO CHANGED', this, this.data, data);
 		}
 	}
 	bind() {
@@ -72,7 +72,7 @@ class SyncView {
 
 		// if(this.name) console.log(this.name + ' doing hasChanged #########################');
 		if(!this.data && !newData) {
-		 	if(this.name) console.log(this.name + 'here1 both are null');
+		 	//if(this.name) console.log(this.name + 'here1 both are null');
 		 	return false;
 		}
 		if((this.data && !newData) || (!this.data && newData)) { 

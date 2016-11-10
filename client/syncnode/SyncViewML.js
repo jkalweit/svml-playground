@@ -80,6 +80,13 @@ class SyncViewML {
 				else return {};
 		}
 
+		constructor() {
+			this.components = {
+				List: { builtin: List },
+				Input: { builtin: Input }
+			};
+			this.instances = {};
+		}
 
 
 		findComponents(lines) {
@@ -98,14 +105,14 @@ class SyncViewML {
 										var options = SyncViewML.getOptions(trimmed);
 										options.elem = options.elem || 'div';
 										currComponent = {
-											name: componentName,
-											classes: classes,
-											ctor: new Function(`
-												this.node = SV.el('${options.elem}');
-												this.eventHandlers = {};
-												this.bindings = {};
-											`),
-											code: ''
+name: componentName,
+	  classes: classes,
+	  ctor: new Function(`
+					  this.node = SV.el('${options.elem}');
+					  this.eventHandlers = {};
+					  this.bindings = {};
+					  `),
+	  code: ''
 										};
 
 										currComponent.ctor.prototype = Object.create(SyncView.prototype);
@@ -127,8 +134,6 @@ class SyncViewML {
 
 		parse(code, container) {
 
-				this.components = this.components || {};
-				this.instances = this.instances || {};
 				container = container || document.body;
 
 
@@ -152,14 +157,17 @@ class SyncViewML {
 										var id = SyncViewML.getId(trimmed);
 										var componentName = SyncViewML.getTag(trimmed);
 										var classes = SyncViewML.getClasses(trimmed);
-										componentInstance = this.buildComponent(componentName, SyncViewML.getOptions(trimmed));
+										var toInit = [];
+										componentInstance = this.buildComponent(componentName, SyncViewML.getOptions(trimmed), toInit);
 										if(componentInstance) {
-											componentInstance.node.className += ' ' + classes;
-											if(addToContainer) {
-													container.appendChild(componentInstance.node);
-											}
-											this.instances[id] = componentInstance;
+												componentInstance.node.className += ' ' + classes;
+												if(addToContainer) {
+														container.appendChild(componentInstance.node);
+												}
+												console.log('adding', id);
+												this.instances[id] = componentInstance;
 										}
+										toInit.forEach((instance) => { instance.init(); });
 								}			
 						}
 				}
@@ -167,8 +175,9 @@ class SyncViewML {
 		}
 
 
-		buildComponent(componentName, options) {
+		buildComponent(componentName, options, toInit) {
 
+				toInit = toInit || [];
 
 				if(typeof componentName === 'function') {
 						//args.unshift(null);
@@ -179,9 +188,8 @@ class SyncViewML {
 
 
 				var component = this.components[componentName]; 
-
-				if(!component) {
-						var ctor = window[componentName];
+				if(!component || component.builtin) {
+						var ctor = component.builtin || window[componentName];
 						//args.unshift(null);
 						if(!ctor) {
 								console.error('Cannot find component:', componentName);
@@ -189,13 +197,13 @@ class SyncViewML {
 						}
 						var instance = new (Function.prototype.bind.call(ctor, this, options));
 						instance.svml = this;
-						if(instance.init) instance.init();
+						if(instance.init) toInit.push(instance);
 						return instance;
 				}
 
 
 				var componentInstance = new component.ctor();
-				componentInstance.node.className += ' ' + component.classes;
+				componentInstance.node.className += (' ' + component.classes).trim();
 				var lines = component.code.split('\n');
 				var el;
 				for(var i = 0; i < lines.length; i++) {
@@ -210,8 +218,10 @@ class SyncViewML {
 										var classes = SyncViewML.getClasses(trimmed);
 										var inner = SyncViewML.getText(trimmed);
 										var displayName = componentName + ':' + id + ':' + tag; // for debugger	
+										var skipElement = false;
 										//console.log('Display Name: ', displayName);
 										if(trimmed === 'events:') {
+												skipElement = true;
 												var code = SyncViewML.getCode(trimmed);
 												while(i+1 < lines.length && SyncViewML.numTabs(lines[i+1]) > 1) {
 														i = i+1;
@@ -220,6 +230,7 @@ class SyncViewML {
 												SyncViewML.parseEvents(code, componentInstance.node, componentInstance, 1, displayName);
 
 										} else if(trimmed === 'style:') {
+												skipElement = true;
 												var style = SyncViewML.getCode(trimmed);
 												while(i+1 < lines.length && SyncViewML.numTabs(lines[i+1]) > 1) {
 														i = i+1;
@@ -248,7 +259,7 @@ class SyncViewML {
 
 										if(SyncViewML.isCapitalized(tag)) {
 												var options2 = SyncViewML.getOptions(trimmed);
-												el = this.buildComponent(tag, options2);
+												el = this.buildComponent(tag, options2, toInit);
 												if(classes) el.node.className += ' ' + classes;
 												if(id) el.node.id = id;
 												componentInstance.node.appendChild(el.node);
@@ -263,7 +274,7 @@ class SyncViewML {
 												Object.defineProperty(el, 'name', { value: displayName });
 												el.displayName = displayName;
 												//if(id === 'init') console.log('code', id, args, code);
-										} else {
+										} else if(!skipElement) {
 
 												el = SV.el(tag, { 
 parent: componentInstance.node,
@@ -273,7 +284,9 @@ innerHTML: inner
 });
 }
 
+
 if(id) componentInstance[id] = el;
+
 } else if(tabs === 2) {
 		var prop = SyncViewML.getProp(trimmed);
 		if(prop === 'style') {
@@ -319,8 +332,11 @@ if(id) componentInstance[id] = el;
 }
 }
 
-if(componentInstance.init) componentInstance.init.call(componentInstance, options);
 componentInstance.svml = this;
+if(componentInstance.init) {
+	//componentInstance.init.call(componentInstance, options);
+	toInit.push(componentInstance);
+}
 return componentInstance;
 }
 
@@ -352,6 +368,8 @@ static parseEvents(code, el, context, tabsBase, displayName) {
 				}
 		}
 }
+
+
 }
 
 
@@ -372,7 +390,9 @@ class List extends SyncView {
 				itemsArr.forEach((item) => {
 								var view  = this.views[item.key];
 								if(!view) {
-								view = this.svml.buildComponent(this.ctor);
+								var toInit = [];
+								view = this.svml.buildComponent(this.ctor, null, toInit);
+								toInit.forEach((instance) => { instance.init(); });
 								this.views[item.key] = view;
 								view.update(item);
 								this.emit('viewAdded', view);
@@ -398,88 +418,88 @@ class List extends SyncView {
 
 
 class Input extends SyncView {
-	constructor(options) {
-		super();
+		constructor(options) {
+				super();
 
-		this.node.className = 'label-set col-nofill';
-		options = options || {};
-		this.options = options;
+				this.node.className = 'label-set col-nofill';
+				options = options || {};
+				this.options = options;
 
 
-		this.doFlash = true;
-		
-		if(options.label) {
-			SV.el('span', { parent: this.node, innerHTML: this.options.label, className: 'label' });
-		}
+				this.doFlash = true;
 
-		if(options.number) {
-			this.options.validator = this.options.validator || Input.NumberValidator;
-			this.options.parser = this.options.parser || Input.NumberParser;
-			this.options.formatter = this.options.formatter || SV.formatCurrency;
-		}
-
-		var elem = this.options.isTextArea ? 'textarea' : 'input';
-		this.input = SV.el(elem, { parent: this.node,
-			events: { 
-				focus: () => {
-					this.input.select();
-				},
-				blur: () => {
-					var value = this.input.value;			
-					if(this.options.validator) {
-							if(!this.options.validator(value)) {
-								alert('Invalid value: "' + value + '"');
-								return;
-							}
-					}
-
-					if(this.options.parser) { 
-							value = this.options.parser(value);
-							if(this.input.value !== value) {
-								this.input.value = this.options.formatter ? this.options.formatter(value) : value; 
-							}
-					}
-					if(this.data && this.data[this.options.prop] !== value) {
-						var oldValue = this.data[this.options.prop];
-						this.data.set(this.options.prop, value);
-						this.emit('changed', value, oldValue);
-					}
+				if(options.label) {
+						SV.el('span', { parent: this.node, innerHTML: this.options.label, className: 'label' });
 				}
-			}});
-		if(options.number) this.input.style.textAlign = 'right';
-		if(options.datalist) this.input.setAttribute('list', options.datalist);
-	}
-	focus() {
-		this.input.focus();
-	}
-	render() {
-		if(this.data && this.input.value !== this.data[this.options.prop]) {
-			var val = this.data[this.options.prop] || '';
-			this.input.value = this.options.formatter ? this.options.formatter(val) : val; 
-		}
-	}
 
-	static NumberValidator(val) {
+				if(options.number) {
+						this.options.validator = this.options.validator || Input.NumberValidator;
+						this.options.parser = this.options.parser || Input.NumberParser;
+						this.options.formatter = this.options.formatter || SV.formatCurrency;
+				}
+
+				var elem = this.options.isTextArea ? 'textarea' : 'input';
+				this.input = SV.el(elem, { parent: this.node,
+								events: { 
+focus: () => {
+this.input.select();
+},
+blur: () => {
+var value = this.input.value;			
+if(this.options.validator) {
+if(!this.options.validator(value)) {
+alert('Invalid value: "' + value + '"');
+return;
+}
+}
+
+if(this.options.parser) { 
+value = this.options.parser(value);
+if(this.input.value !== value) {
+this.input.value = this.options.formatter ? this.options.formatter(value) : value; 
+}
+}
+if(this.data && this.data[this.options.prop] !== value) {
+		var oldValue = this.data[this.options.prop];
+		this.data.set(this.options.prop, value);
+		this.emit('changed', value, oldValue);
+}
+}
+}});
+if(options.number) this.input.style.textAlign = 'right';
+if(options.datalist) this.input.setAttribute('list', options.datalist);
+}
+focus() {
+		this.input.focus();
+}
+render() {
+		if(this.data && this.input.value !== this.data[this.options.prop]) {
+				var val = this.data[this.options.prop] || '';
+				this.input.value = this.options.formatter ? this.options.formatter(val) : val; 
+		}
+}
+
+static NumberValidator(val) {
 		if(typeof val === 'number') return true;
 		if(val.trim() == '') return true;
 		val = val.replace('$', '');
 		return !isNaN(parseFloat(val));
-	}
-	static NumberParser(val) {
+}
+static NumberParser(val) {
 		if(typeof val === 'number') return val;
 		if(val.trim() == '') return 0;
 		val = val.replace(',', '');
 		val = val.replace('$', '');
 		return parseFloat(val);
-	}
+}
 
-	static DateValidator(val) {
+static DateValidator(val) {
 		if(val.trim() == '') return true;
 		return moment(val, 'MM/DD/YYYY hh:mma').isValid(); 
-	}
-	static DateParser(val) {
+}
+static DateParser(val) {
 		if(val.trim() == '') return null;
 		return moment(val, 'MM/DD/YYYY hh:mma').toISOString();
-	}
+}
 }
 

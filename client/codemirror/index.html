@@ -1,4 +1,4 @@
-<htme>
+<html>
 <head>
 <link rel="stylesheet" type="text/css" href="/css/app.css">
 <link rel="import" id="components" href="/components.html">
@@ -18,33 +18,12 @@
 <style>
 
 .CodeMirror {
-	width: 100%;
-	height: 100%;
-	border-right: 1px solid #000;
-}
-
-#editor {
 	position: absolute;
-	left: 0; 
-	top: 0;
-	bottom: 40%;
-	right: 50%;
-}
-#dataEditor {
-	position: absolute;
-	left: 0; 
-	top: 60%;
-	bottom: 0;
-	right: 50%;
-	border-top: 1px solid #666;
-}
-#preview {
-	position: absolute;
-	left: 50%; 
 	top: 0;
 	bottom: 0;
+	left: 0;
 	right: 0;
-	border-left: 1px solid #666;
+	height: auto;
 }
 
 </style>
@@ -52,105 +31,254 @@
 </head>
 <body style="background-color: #FFF;">
 
-<div id="editor"></div>
-<div id="dataEditor"></div>
-<div id="preview"></div>
 
-<script id="code" type="text/x-svml">// Use ctl-s to save changes and updated the preview. You can edit the JSON too.
-//NOTE: The number of tabs beginning each line matters to the parser.
+<script id="views" type="text/x-svml">
 
-// Declare top level tag instances like this: #[id]:[tag|Component]
-// In this playground, the id must be 'mainView' to get data updates.
 #mainView:MainView
 
-// Component definitions start with an uppercase:
 MainView
-	// style is any valid css:
 	style:
-		padding: 8px;
-	#test:function(hello)
-		var tex = 4;
-	// declare children like this: #[id]:[tag] '[innerHTML]'
-	#title:h2 'Hello World'
-	// items without a ':tag' are automatically divs
-	#nameSetManually
-	// you can bind data to innerHTML like this (bindings are 1-way)
-	#nameAsBinding $(data.name)
-	// if you need more flexibility, then make another component:
-	#customComponent:ColorChangingText $(update=data.custom)
-	// render is called when the data version changes
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+	#editors:EditorsColumn
+	#drawer:Drawer
+	#preview:Preview
+	#select:function(key)
+		this.selectedItem = this.data.components[key];
+		this.editors.update(this.selectedItem);
+		this.preview.update(this.selectedItem);
+	#init:function
+		this.drawer.toggle();
+		document.addEventListener('keypress', e => {
+			if(e.keyCode === 94) { // 94 = '^'
+				this.isAdminMode = !this.isAdminMode;
+				this.emit('adminModeChanged'); 
+			}
+		});
 	#render:function
-		// any javascript is valid in a function, just remember to 
-		// insert enough tabs to keep it under the definition:
-		console.log('rendering', this.data);
-		this.nameSetManually.innerHTML = this.data.name;
+		if(this.selectedItem) this.select(this.selectedItem.key);	
+		this.drawer.update(this.data);
 
-
-ColorChangingText
+Drawer
 	style:
-		margin: 32px;
-	#text
-	#blueBtn:button 'Blue'
+		position: absolute;
+		left: -100px;
+		top: 0;
+		bottom: 0;
+		width: 120px;
+		background-color: #DDD;
+		z-index: 100;
+		box-shadow: 2px 2px 2px 2px #888;
+		border-right: 1px solid #666;
+		transition: left 0.5s;
+	#addBtn:button '+'
+		style:
+			position: absolute;
+			top: 0;
+			left: 0;
 		events:
 			click:
-				this.data.set('color', '#00F');
-	#greenBtn:button 'Green'
+				this.addComponent();
+	#toggleBtn:button '>'
+		style:
+			position: absolute;
+			top: 0;
+			right: 0;
 		events:
 			click:
-				this.data.set('color', '#0F0');
+				this.toggle();
+	#components:List({ ctor: 'ComponentItem' })[list]
+		style:
+			margin-top: 2em;
+			border-top: 1px solid #888;
+	#addComponent:function
+		if(!this.data.components) this.data.set('components', {});
+		var item = {
+			key: SyncNode.guidShort(),
+			created: new Date().toISOString(),
+			name: 'New Component',
+			note: '',
+			code: '',
+			data: ''
+		};
+		this.data.components.set(item.key, item);
+	#toggle:function
+		this.isOpen = !this.isOpen;
+		this.emit('toggle');
+		if(this.isOpen) {
+			this.node.style.left = '0px';
+			svml.instances.mainView.editors.node.style.left = '120px';
+			this.toggleBtn.innerHTML = '<';
+		} else {
+			this.node.style.left = '-100px';
+			svml.instances.mainView.editors.node.style.left = '20px';
+			this.toggleBtn.innerHTML = '>';
+		}
+	#updateAdminMode:function
+		var adminMode = svml.instances.mainView.isAdminMode;
+		this.addBtn.style.display = adminMode ? 'inline-block' : 'none';
+	#init:function
+		this.updateAdminMode();
+		svml.instances.mainView.on('adminModeChanged', () => {
+			this.updateAdminMode();
+		});
 	#render:function
-		this.text.innerHTML = this.data.text;
-		this.text.style.color = this.data.color;
+		this.components.update(this.data.components);
+
+
+ComponentItem[item tight]
+	style:
+		font-size: 10px;
+	events:
+		click:
+			svml.instances.mainView.select(this.data.key);
+	#nameSpan $(data.name)
+
+
+EditorsColumn[col-flex]
+	style:
+		position: absolute;
+		left: 20; 
+		top: 0;
+		bottom: 100%;
+		right: 50%;
+		transition: left 0.5s;
+		overflow: hidden;
+	#details:EditDetails[col-nofill] $(update=data)
+	#editor:Editor[col-fill]
+		style:
+			transition: height 0.5s;
+		events:
+			save:function(val)
+				this.data.set('code', val);
+	#dataEditor:Editor[col-nofill]
+		style:
+			height: 40%;
+			border-top: 1px solid #BBB;
+			transition: height 0.5s;
+		events:
+			save:function(val)
+				try {
+					eval('var data = ' + val + ';');
+					data.version = SyncNode.guidShort();
+					this.data.merge({
+						__remove: 'data',
+						data: data
+					});
+				} catch (e) {
+					console.log('Could not parse data.');
+				}
+	#render:function
+		if(this.data) {
+			this.node.style.bottom = '0';
+			this.editor.update(this.data.code || '');
+			var dataStr = JSON.stringify(this.data.data || {}, null, '\t');
+			this.dataEditor.update(dataStr);	
+		} else {
+			this.node.style.bottom = '100%';
+		}
+
+EditDetails[row row-flex]
+	style:
+		border-bottom: 1px solid #BBB;
+		padding: 4px;
+	#nameInput:Input({ prop: 'name' }) $(update=data)
+		style:
+			display: none;
+	#remove:button 'Delete'
+		style:
+			display: none;
+		events:
+			click:
+				Modal.confirm('Delete example?', '', () => {
+					var key = this.data.key;
+					var parent = this.data.parent;
+					svml.instances.mainView.select(null);
+					parent.remove(key);
+				});
+	#setDefault:button 'Set Default'
+		style:
+			display: none;
+		events:
+			click:
+				this.data.set('defaults', {
+					code: this.data.code,
+					data: this.data.data
+				})
+	#empty[row-fill]
+	#restoreDefault:button 'Reset Example'
+		events:
+			click:
+				this.data.merge({
+					__remove: 'data',
+					code: this.data.defaults.code,
+					data: this.data.defaults.data
+				})
+	#updateAdminMode:function
+		var adminMode = svml.instances.mainView.isAdminMode;
+		this.setDefault.style.display = adminMode ? 'inline-block' : 'none';
+		this.remove.style.display = adminMode ? 'inline-block' : 'none';
+		this.nameInput.node.style.display = adminMode ? 'inline-block' : 'none';
+	#init:function
+		this.updateAdminMode();
+		svml.instances.mainView.on('adminModeChanged', () => {
+			this.updateAdminMode();
+		});
+
+Editor
+	style:
+		position: relative;
+	events:
+		keydown(e):	
+			if(e.ctrlKey && e.keyCode === 83) {
+				e.preventDefault();
+				this.doSave();
+				return false;
+			}
+	#doSave:function
+		this.emit('save', this.cm.getValue());
+	#init:function
+		this.cm = CodeMirror(this.node, {
+			mode: "svml",
+			keyMap: "vim",
+			lineNumbers: true,
+			indentWithTabs: true
+		});
+		this.cm.save = () => {
+			this.doSave();
+		};
+	#render:function
+		var cursor = this.cm.getCursor();
+		this.cm.setValue(this.data);
+		this.cm.setCursor(cursor);
+
+
+Preview
+	style:
+		position: absolute;
+		left: 50%; 
+		top: 0;
+		bottom: 0;
+		right: 0;
+		border-left: 1px solid #666;
+	#render:function
+		this.node.innerHTML = '';
+		if(this.data) {
+			var svmlPreview = new SyncViewML();
+			svmlPreview.parse(this.data.code, this.node);
+			if(svmlPreview.instances.mainView) {
+				if(!this.data.data) this.data.set('data', {});
+				svmlPreview.instances.mainView.update(this.data.data || {});
+			}
+		}
+
+
 </script>
 
-
-
-
 <script>
-var editor = document.getElementById('editor');
-var dataEditor = document.getElementById('dataEditor');
-var preview = document.getElementById('preview');
-var cm = CodeMirror(editor, {
-	value: 'Loading...',
-	mode: "svml",
-	keyMap: "vim",
-	lineNumbers: true,
-	indentWithTabs: true
-});
-var cm2 = CodeMirror(dataEditor, {
-	value: 'Loading...',
-	mode: "javascript",
-	keyMap: "vim",
-	lineNumbers: true,
-	indentWithTabs: true
-});
-
-editor.addEventListener('keydown', (e) => {
-	if(e.ctrlKey && e.keyCode === 83) {
-		e.preventDefault();
-		sync.data.set('code', cm.getValue());
-		return false;
-	}
-});
-dataEditor.addEventListener('keydown', (e) => {
-	if(e.ctrlKey && e.keyCode === 83) {
-		console.log('save data...');
-		e.preventDefault();
-		try {
-			eval('var data = ' + cm2.getValue());
-			data.version = SyncNode.guidShort();
-			console.log('datdddddda', data);
-			console.log('data', sync.data);
-			sync.data.merge({
-				__remove: 'data',
-				data: data
-			});
-		} catch (e) {
-			console.log('Could not parse data.');
-		}
-		return false;
-	}
-});
 
 </script>
 
@@ -163,23 +291,13 @@ dataEditor.addEventListener('keydown', (e) => {
 SV.startReloader();
 
 var sync = new SyncNodeSocket('/data', {});
-window.List = List;
-window.Input = Input;
 
 var svml = new SyncViewML();
 SV.onLoad(() => { 
+		svml.parse(SV.id('views').innerHTML); 
+
 		sync.on('updated', (data) => {
-			var code = data.code || '';
-			cm.setValue(code);
-			var dataStr = JSON.stringify(data.data || {}, null, '\t');
-			console.log('dataStr', dataStr);
-			cm2.setValue(dataStr);
-			var svmlPreview = new SyncViewML();
-			preview.innerHTML = '';
-			svmlPreview.parse(code, preview);
-			if(svmlPreview.instances.mainView) {
-				svmlPreview.instances.mainView.update(data.data || {});
-			}
+			svml.instances.mainView.update(data);
 		});
 });
 

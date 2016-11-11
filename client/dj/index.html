@@ -1,0 +1,224 @@
+<htme>
+<head>
+<link rel="stylesheet" type="text/css" href="/css/app.css">
+<link rel="import" id="components" href="/lib/svml/components.html">
+<script type="text/javascript" src="https://www.youtube.com/iframe_api"></script>
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNode.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncView.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncViewML.js"></script>
+</head>
+<body style="background-color: #444; padding: 1em;">
+
+
+<script id="views" type="text/x-svml">
+
+#mainView:MainView
+!#requestSubmit:RequestSubmit
+!#requestEdit:RequestEdit
+
+
+MainView
+	:style
+		padding: 8px;
+		background-color: #FFF;
+	#title:h1 'Music'
+		style:
+			color: #FFF;
+	#playerLeftDiv
+	#playerRightDiv
+	:hr
+	:button 'Fade Left'
+		style:
+			margin-left: 1em;
+			width: 21em;
+			height: 3em;
+		events:
+			click:
+				this.fade(this.playerRight, this.playerLeft);
+	:button 'Fade Right'
+		style:
+			margin-left: 4em;
+			width: 21em;
+			height: 3em;
+		events:
+			click:
+				this.fade(this.playerLeft, this.playerRight);
+	:hr
+	#queue:Queue $(update=data.music.queue)
+		style:
+			margin-top: 1em;
+	#playLeft:function(id)
+		this.play(id, this.playerLeft);
+	#playRight:function(id)
+		this.play(id, this.playerRight);
+	#play:function(id, player);
+		player.setVolume(0);		
+		player.loadVideoById(id);
+	#fade:function(from, to)
+		var volFrom = 100;
+		var volTo = 0;
+		function fadeHelper() {
+			from.setVolume(volFrom);
+			to.setVolume(volTo);
+			if(volFrom > 0) {
+				volFrom -= 5;
+				volTo += 5;
+				setTimeout(() => {
+					fadeHelper();			
+				}, 200);
+			}
+		}
+		fadeHelper();
+		
+		
+	#init:function
+		this.playerLeft = new YT.Player(this.playerLeftDiv, {
+			height: '200',
+			width: '300',
+			videoId: '',
+			events: {}
+		});
+		this.playerRight = new YT.Player(this.playerRightDiv, {
+			height: '200',
+			width: '300',
+			videoId: ''
+		});
+	#render:function
+
+
+
+
+			
+
+Queue
+	style:
+		width: 50em;
+	#input:input
+		style:
+			margin-left: 1em;
+			width: 30em;
+	#addBtn:button 'Request'
+		style:
+			margin-left: 1em;
+		events:
+			click:
+				var id = this.input.value;
+				if(id.length > 12) {
+					var result = /v=(.*$)/.exec(id);
+					if(!result) return; 
+					id = result[1];
+				}
+				var item = {
+					key: SyncNode.guidShort(),
+					createdAt: new Date().toISOString(),
+					id: id
+				};
+				io().emit('get video info', item);
+	#list:List({ ctor: 'QueueItem' })[list]
+		style:
+			margin-top: 1em;
+	#init:function
+		io().on('get video info result', (item) => {
+			svml.instances.requestSubmit.update(item);
+			svml.instances.requestSubmit.show();
+		});
+	#render:function
+		this.list.update(this.data);
+
+QueueItem[item row row-flex tight]
+	#playLeft:button[row-nofill] 'Left'
+		events:
+			click:
+				svml.instances.mainView.playLeft(this.data.id);
+	#playRight:button[row-nofill] 'Right'
+		events:
+			click:
+				svml.instances.mainView.playRight(this.data.id);
+	#edit:button[row-nofill] 'Edit'
+		events:
+			click:
+				svml.instances.requestEdit.update(this.data);
+				svml.instances.requestEdit.show();
+	#title[row-fill] $(data.info.title)
+		style:
+			padding-left: 8px;
+			color: #BBB;
+
+
+RequestSubmit
+	#videoTitle:h1 $(data.info.title)
+	#submit[btn] 'Request Video'
+		style:
+			margin-top: 1em;
+		events:
+			click:
+				this.data.createdAt = new Date().toISOString();
+				svml.instances.mainView.data.music.queue.set(this.data.key, this.data);
+				svml.instances.mainView.queue.input.value = '';
+				this.modal.hide();
+	#cancel[btn] 'Cancel'
+		events:
+			click:
+				this.modal.hide();
+	#show:function
+		this.modal.show();
+	#init:function
+		this.modal = Modal.createModal(this);
+	#render:function
+		console.log('data', this.data);
+		
+RequestEdit
+	#idSpan:p $(data.id)
+	#videoTitle:Input({ label: 'Title', prop: 'title' }) $(update=data.info)
+	#ok[btn] 'Ok'
+		style:
+			margin-top: 1em;
+		events:
+			click:
+				this.modal.hide();
+	#remove[btn] 'Remove'
+		events:
+			click:
+				this.data.parent.remove(this.data.key);
+				this.modal.hide();
+	#show:function
+		this.modal.show();
+	#init:function
+		this.modal = Modal.createModal(this);
+	#render:function
+		console.log('data', this.data);
+	
+
+</script>
+
+
+
+<script>
+"use strict"
+
+
+SV.startReloader();
+
+var sync = new SyncNodeSocket('/data', {});
+window.List = List;
+window.Input = Input;
+
+var svml = new SyncViewML();
+SV.onLoad(() => { 
+		svml.importCode('components'); 
+		svml.parse(SV.id('views').innerHTML); 
+		sync.on('updated', (data) => {
+			if(!data.music) {
+					data.set('music', { queue: {} });
+			}
+			svml.instances.mainView.update(data);
+		});
+		
+});
+
+
+</script>
+</body>
+</html>

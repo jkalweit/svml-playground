@@ -30,6 +30,7 @@ app.use(function (req, res, next) {
 
 
 var syncServer = new Sync(io, { namespace: 'data', dataDirectory: '../private' });
+var examplesServer = new Sync(io, { namespace: 'examples', dataDirectory: '../private' });
 app.use('/', express.static('client/'));
 
 

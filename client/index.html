@@ -1,186 +1,133 @@
-<htme>
+<html>
 <head>
 <link rel="stylesheet" type="text/css" href="/css/app.css">
-<link rel="import" id="components" href="/components.html">
+<link rel="import" id="components" href="/lib/svml/components.html">
+<link rel="import" id="editorComponents" href="/editor/components.html">
 <script type="text/javascript" src="/socket.io/socket.io.js"></script>
-<script type="text/javascript" src="/syncnode/SyncNode.js"></script>
-<script type="text/javascript" src="/syncnode/SyncNodeSocket.js"></script>
-<script type="text/javascript" src="/syncnode/SyncView.js"></script>
-<script type="text/javascript" src="/syncnode/SyncViewML.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNode.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncView.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncViewML.js"></script>
+
+<style>
+
+.CodeMirror {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: auto;
+}
+
+</style>
+
 </head>
-<body>
+<body style="background-color: #FFF;">
 
 
-<script id="views" type="text/syncviewml">
+<script id="views" type="text/x-svml">
 
 #mainView:MainView
 
-MainView[row-flex]
-	:style
-		padding: 8px;
-		background-color: #DDD;
-	#editor:Editor
+MainView
+	style:
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+	#drawer:Drawer
+		events:
+			selected:function(item)
+				this.select(item.key);
 	#preview:Preview
-	#render:function
-		this.editor.update(this.data);
-		this.preview.update(this.data);
-
-
-Editor[row-fill]
-	style:
-		margin: 8px;
-	#title:h2 'Editor'
 		style:
-			color: #FFF;
-	#code:textarea$(data.code)
-		style:
-			width: 100%;
-			height: 25em;
-			tab-size: 4;
-		events:
-			keydown:function(e)
-				if(e.keyCode === 9) {
-					e.preventDefault();
-					var val = this.code.value;
-					var start = this.code.selectionStart;
-					var end = this.code.value.length;
-					var pre = val.substring(0, start);
-					var post = val.substring(start, end);
-					this.code.value = pre + '\t' + post;
-					this.code.selectionStart = start + 1;
-					this.code.selectionEnd = this.code.selectionStart;
-					return false;	
-				}
-				if(e.ctrlKey && e.keyCode === 83) {
-					e.preventDefault();
-					this.saveCode();
-					return false;
-				}
-	#saveCode:function
-		this.data.set('code', this.code.value);
-	#dataEditor:textarea
-		style:
-			width: 100%;
-			height: 15em;
-			tab-size: 4;
-		events:
-			keydown:function(e)
-				if(e.keyCode === 9) {
-					e.preventDefault();
-					var val = this.dataEditor.value;
-					var start = this.dataEditor.selectionStart;
-					var end = this.dataEditor.value.length;
-					var pre = val.substring(0, start);
-					var post = val.substring(start, end);
-					this.dataEditor.value = pre + '\t' + post;
-					this.dataEditor.selectionStart = start + 1;
-					this.dataEditor.selectionEnd = this.dataEditor.selectionStart;
-					return false;	
-				}
-				if(e.ctrlKey && e.keyCode === 83) {
-					e.preventDefault();
-					this.saveData();
-					return false;
-				}
-	#saveData:function
-		try {
-			eval('var data = ' + this.dataEditor.value);
-			data.version = SyncNode.guidShort();
-			console.log('datdddddda', data);
-			this.data.merge({
-				__remove: 'data',
-				data: data
-			});
-		} catch (e) {
-			console.log('Could not parse data.');
-		}
-
-	#saveAndUpdatePreview:button 'Save & Preview (ctl-s)'
-		events:
-			click:
-				this.saveCode();
-				this.saveData();
-	#saveToBasic:button 'Save to Basic'
-		style:
-			display: none;
-		events:
-			click:
-				this.data.examples.merge({
-					__remove: 'basic',
-					basic: {
-						code: this.data.code,
-						data: this.data.data
-					}
-				});
-	#saveToComplete:button 'Save to Complete'
-		style:
-			display: none;
-		events:
-			click:
-				this.data.examples.merge({
-					__remove: 'complete',
-					complete: {
-						code: this.data.code,
-						data: this.data.data
-					}
-				});
-	#loadBasic:button 'Load Basic Example'
-		events:
-			click:
-				this.data.merge({
-					__remove: ['code', 'data'],
-					code: this.data.examples.basic.code,
-					data: this.data.examples.basic.data
-				});
-	#loadComplete:button 'Load Complete Example'
-		events:
-			click:
-				this.data.merge({
-					__remove: ['code', 'data'],
-					code: this.data.examples.complete.code,
-					data: this.data.examples.complete.data
-				});
+			transition: left 0.5s;	
+	#select:function(key)
+		this.selectedItem = this.data.components[key];
+		this.preview.update(this.selectedItem);
+		this.emit('selectedItemChanged');
 	#init:function
-		this.code.setAttribute('spellcheck', false);
-		this.dataEditor.setAttribute('spellcheck', false);
-	#render:function
-		var asString = typeof this.data.data === 'string' ? this.data.data : JSON.stringify(this.data.data, null, "\t");
-		this.dataEditor.value = asString;
-	
-	
-Preview[row-fill]
-	style:
-		margin: 8px;
-	#title:h2 'Preview'
-		style:
-			color: #FFF;
-	#preview
-		style:
-			background-color: #FFF;
-			border: 1px solid #000;
-	#render:function
-		this.preview.innerHTML = '';
-		var svml2 = new SyncViewML();
-		svml2.parse(this.data.code, this.preview); 
-		try {
-			var data;
-			if(typeof this.data.data === 'string') {
-				eval('data = ' + this.data.data);  //JSON.parse(this.data.data);
-			} else {
-				data = this.data.data;
+		this.drawer.toggle();
+		document.addEventListener('keypress', e => {
+			if(e.keyCode === 94) { // 94 = '^'
+				this.isAdminMode = !this.isAdminMode;
+				this.emit('adminModeChanged'); 
 			}
-		} catch (e) {
-			console.log('Could not parse data.');
-		}
-		var sync = new SyncNode(data);
-		sync.on('updated', (updated) => {
-			this.data.merge({
-				__remove: 'data',
-				data: updated
-			});
 		});
-		svml2.instances.mainView.update(sync);
-		
+	#render:function
+		if(this.selectedItem) this.select(this.selectedItem.key);	
+		this.drawer.update(this.data);
+		this.first;
+		if(!this.first) {
+			this.first = true;
+			var c = SV.toArray(this.data.components)[0];
+			if(c) this.select(c.key);
+		}
+
+Drawer
+	style:
+		position: absolute;
+		left: -100px;
+		top: 0;
+		bottom: 0;
+		width: 120px;
+		background-color: #FFF;
+		z-index: 100;
+		box-shadow: 2px 2px 2px 2px #888;
+		border-right: 1px solid #BBB;
+		transition: left 0.5s;
+	#title 'Home'
+		style:
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 2em;
+			line-height: 2em;
+			padding-left: 1em;
+			background-color: #00B;
+			color: #FFF;
+	#toggleBtn[material-icons] 'keyboard_arrow_left'
+		style:
+			position: absolute;
+			top: 0;
+			right: 0;
+			color: #FFF;
+			margin-top: 0.2em;
+		events:
+			click:
+				this.toggle();
+	#components:List({ ctor: 'ComponentItem' })[list]
+		style:
+			margin-top: 2em;
+			border-top: 1px solid #BBB;
+		events:
+			viewAdded:function(view)
+				view.on('selected', (item) => {
+					this.emit('selected', item);
+				});
+	#toggle:function
+		this.isOpen = !this.isOpen;
+		this.emit('toggle');
+		if(this.isOpen) {
+			this.node.style.left = '0px';
+			svml.instances.mainView.preview.node.style.left = '120px';
+			this.toggleBtn.innerHTML = 'keyboard_arrow_left';
+		} else {
+			this.node.style.left = '-100px';
+			svml.instances.mainView.preview.node.style.left = '20px';
+			this.toggleBtn.innerHTML = 'keyboard_arrow_right';
+		}
+	#render:function
+		this.components.update(this.data.components);
+
+
+
+</script>
+
+<script>
 
 </script>
 
@@ -193,13 +140,14 @@ Preview[row-fill]
 SV.startReloader();
 
 var sync = new SyncNodeSocket('/data', {});
-window.List = List;
-window.Input = Input;
+window.localSettings = new LocalSyncNode('localSettings');	
 
 var svml = new SyncViewML();
 SV.onLoad(() => { 
 		svml.importCode('components'); 
+		svml.importCode('editorComponents'); 
 		svml.parse(SV.id('views').innerHTML); 
+
 		sync.on('updated', (data) => {
 			svml.instances.mainView.update(data);
 		});

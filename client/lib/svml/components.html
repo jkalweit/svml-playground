@@ -1,0 +1,278 @@
+<script type="text/x-svml">
+
+AdminPin
+	#title:h1 'Enter Admin Pin'
+	#error:h3[hide] 'Incorrect, try again'
+		style:
+			color: #F00;
+	#pin:Input({ label: 'Pin' })
+	#submit[btn] 'Submit'
+		events:
+			click:
+				this.doSubmit();
+	#cancel[btn] 'Cancel'
+		events:
+			click:
+				this.modal.hide();
+	#doSubmit:function
+		this.error.classList.add('hide');
+		rms.verifyAdminPin(this.pin.input.value, (result) => {
+			this.pin.input.value = '';
+			if(result) {
+				if(this.callback) this.callback();
+				this.callback = null;
+				this.modal.hide();
+			} else {
+				this.error.classList.remove('hide');
+			}
+		});
+	#verify:function(callback)
+		this.error.classList.add('hide');
+		this.pin.input.value = '';
+		this.callback = callback;
+		this.modal.show();
+	#init:function
+		this.pin.input.type = 'password';
+		this.modal = Modal.createModal(this);
+		this.modal.on('show', () => { this.pin.focus(); });
+
+
+
+Select[label-set]
+	#text[label]
+	#selectInput:select
+		events:
+			change:
+				this.selected = this.selectInput.value;
+				this.emit('selected', this.selected);
+	#init:function
+		options = this.options || {};
+		options = options || {};
+		this.prop = options.prop;
+		this.sort = options.sort;
+		if(options.label) this.text.innerHTML = options.label;
+		else this.text.style.display = 'none';
+		if(options.values) {
+			this.data = options.values;
+			this.updateValues();
+		}
+	#select:function(value)
+		this.selectInput.value = value;
+		this.selected = this.selectInput.value;
+	#updateValues:function
+		var selected = this.selectInput.value;
+		this.selectInput.innerHTML = '';
+		var sorted = SV.toArray(this.data, this.sort);
+		sorted.forEach((item) => {
+			var value = this.prop ? SV.getProperty(item, this.prop) : item;
+			SV.el('option', { parent: this.selectInput, innerHTML: value }); 
+		});
+		this.selectInput.value = selected;
+	#render:function
+		this.updateValues()	
+
+
+DateInput[label-set]
+	#text[label]
+	#dateInput:input
+		events:
+			change:
+				this.emit('selected', this.dateInput.value);
+	#select:function(value)
+		this.dateInput.value = value;
+	#init:function
+		options = this.options || {};
+		this.prop = options.prop;
+		if(options.label) this.text.innerHTML = options.label;
+		else this.text.style.display = 'none';
+		this.dateInput.type = 'date';
+	#render:function
+		if(this.data) {
+			this.dateInput.value = this.data[this.prop];
+		}
+
+
+
+LabeledValue[label-set]
+	#label[label]
+	#value[value]
+	#init
+		this.options = this.options || {};
+		this.label.innerHTML = this.options.label;
+	#render:function
+		this.value.style.textAlign = this.options.number ? 'right' : 'left';
+		if(this.options.prop && this.data) {
+			var val = SV.getProperty(this.data, this.options.prop);
+			if(this.options.number) {
+				this.value.innerHTML = SV.formatCurrency(val);
+			} else {
+				this.value.innerHTML = this.options.formatter ? this.options.formatter(val) : val;
+			}
+		}
+
+ToggleButton[btn]
+	#text:span
+	:events
+		click:
+			this.data.set(this.prop, !this.data.get(this.prop));
+			this.emit('changed', this.data.get(this.prop));
+	#init:function
+		options = this.options || {};
+		this.prop = options.prop;
+		this.trueText = options.trueText || 'Yes';
+		this.falseText = options.falseText || 'No';
+	#render:function
+		if(this.data) this.text.innerHTML = this.data.get(this.prop) ? this.trueText : this.falseText;
+
+
+SimpleHeader[header col-nofill row row-flex]
+	#text:span[row-fill]
+	#settings[row-nofill touch material-icons] 'settings'
+		events:
+			click: 
+				this.emit('settings');
+	#add[row-nofill touch material-icons] 'add'
+		events:
+			click: 
+				this.emit('add');
+	#repeat[row-nofill touch material-icons] 'repeat'
+		events:
+			click: 
+				this.emit('repeat');
+	#del[row-nofill touch material-icons] 'delete'
+		events:
+			click: 
+				this.emit('delete');
+	#more[row-nofill touch material-icons] 'settings'
+		events:
+			click: 
+				this.emit('more');
+	#setTitle:function(text)
+		this.text.innerHTML = text;
+	#close[row-nofill touch material-icons] 'done'
+		events:
+			click: 
+				this.emit('close');
+	#init:function 
+		options = this.options || {};
+		this.setTitle(options.text);
+		if(!options.settings)
+			this.settings.style.display = 'none';	
+		if(!options.add)
+			this.add.style.display = 'none';	
+		if(!options.repeat)
+			this.repeat.style.display = 'none';	
+		if(!options.close)
+			this.close.style.display = 'none';	
+		if(!options.more)
+			this.more.style.display = 'none';	
+		if(!options.del)
+			this.del.style.display = 'none';	
+
+SearchHeader[row row-flex]
+	:style 
+		border-bottom: 1px solid rgba(0,0,0,0.5);
+	#searchBox:input[row-fill]
+		events:
+			keydown(e): 
+				if(e.keyCode === 13) this.add();
+			keyup(e):
+				this.emit('searchChanged', this.searchBox.value);
+	#addBtn:div[row-nofill touch material-icons] 'add'
+		events:
+			click: 
+				this.add();
+	#clearBtn:div[row-nofill touch material-icons] 'clear'
+		events:
+			click: 
+				this.clear();
+	#add:function 
+		this.emit('add', this.searchBox.value);
+	#clear:function
+		this.searchBox.value = '';
+		this.emit('searchChanged', this.searchBox.value);
+	#init:function
+		options = this.options || {};
+		if(!options.addBtn) this.addBtn.style.display = 'none';
+		if(!options.clearBtn) this.clearBtn.style.display = 'none';
+		if(!options.searchBox) this.searchBox.style.display = 'none';
+
+
+SearchList[col-flex]
+	#header:SearchHeader({ addBtn: true })[col-noflex]
+		events:
+			add(value):
+				this.emit('add', value);
+			searchChanged(value):
+				this.search(value);
+				this.emit('searchChanged', value);
+	#search:function(value)
+		value = value || '';
+		this.searchValue = value.trim().toLowerCase();
+		this.doFilter();
+	#doFilter:function() 
+		var filtered = this.data || {};
+		if(this.searchProp) {
+			console.log('Warning: doing old filter');
+			if(this.searchValue) {
+				filtered = SV.filterMap(this.data, (item) => { 
+					var itemVal = item[this.searchProp];
+					if(!itemVal) return false;
+					return itemVal.trim().toLowerCase().indexOf(this.searchValue) !== -1;	
+				});
+			}
+		}
+		if(this.postFilter) filtered = this.postFilter(filtered);
+		this.list.update(filtered);
+
+	#init:function
+		options = this.options || {};
+		this.searchProp = options.searchProp;
+		this.header.searchBox.style.display = options.searchBox ? 'inline-block' : 'none';
+		this.header.addBtn.style.display = options.addBtn ? 'inline-block' : 'none';
+		this.header.clearBtn.style.display = options.clearBtn ? 'inline-block' : 'none';
+		this.list = this.appendView(new List({ ctor: options.ctor, sort: options.sort, direction: options.direction }));
+		this.list.node.classList.add('col-fill');
+		this.list.node.classList.add('scroll-y');
+		this.list.node.classList.add('list');
+		this.list.on('viewAdded', (view) => {
+			view.on('selected', (item) => {
+					this.select(item.key);
+				});
+		});
+	#clearSearch:function()
+		this.header.clear();
+		this.search('');
+	#select:function(key)
+		this.selected = this.data[key];
+		this.updateSelected();
+		this.emit('selected', this.selected);
+	#updateSelected:function()
+		//SV.toArray(this.list.views).forEach((view) => {
+		//	var isSelected = this.selected ? this.selected.key === view.data.key : false;
+		//	view.node.classList.toggle('selected', isSelected);
+		//	if(isSelected) view.node.scrollIntoViewIfNeeded();
+		//});
+	#render:function()
+		this.doFilter();
+		if(this.selected) this.selected = this.data[this.selected.key];
+		this.updateSelected();
+	
+SimpleList[col-flex]
+	#init:function
+		options = this.options || {};
+		this.list = this.appendView(new List({ ctor: options.ctor, sort: options.sort, direction: options.direction }));
+		this.list.node.classList.add('col-fill');
+		this.list.node.classList.add('scroll-y');
+		this.list.node.classList.add('list');
+		this.list.on('viewAdded', (view) => {
+			view.on('selected', (item) => {
+					this.select(item);
+				});
+		});
+	#select:function(item)
+		this.emit('selected', item);
+	#render:function()
+		this.list.update(this.data);
+		
+</script>

@@ -1,0 +1,67 @@
+<html>
+<head>
+<link rel="stylesheet" type="text/css" href="/css/app.css">
+<link rel="import" id="components" href="/lib/svml/components.html">
+<link rel="import" id="editorComponents" href="/editor/components.html">
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNode.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncView.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncViewML.js"></script>
+
+<script src="/lib/codemirror/codemirror.js"></script>
+<link rel="stylesheet" href="/lib/codemirror/codemirror.css">
+<script src="/lib/codemirror/css.js"></script>
+<script src="/lib/codemirror/javascript.js"></script>
+<script src="/lib/codemirror/svml.js"></script>
+<script src="/lib/codemirror/vim.js"></script>
+
+<style>
+.CodeMirror {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: auto;
+}
+</style>
+</head>
+<body style="background-color: #FFF;">
+
+
+<script id="views" type="text/x-svml">
+#mainView:EditorView
+</script>
+
+
+
+<script>
+"use strict"
+
+
+SV.startReloader();
+
+var sync = new SyncNodeSocket('/data', {});
+window.localSettings = new LocalSyncNode('localSettings');	
+
+var svml = new SyncViewML();
+SV.onLoad(() => { 
+		svml.importCode('components'); 
+		svml.importCode('editorComponents'); 
+		svml.parse(SV.id('views').innerHTML); 
+		
+		console.log('mainView', svml.instances.mainView);
+		svml.instances.mainView.toggleAdminMode();
+
+		sync.on('updated', (data) => {
+			svml.instances.mainView.update(data);
+		});
+});
+
+
+
+
+</script>
+</body>
+</html>

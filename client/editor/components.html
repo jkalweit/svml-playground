@@ -1,0 +1,294 @@
+<script type="text/x-svml">
+
+EditorView
+	style:
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+	#editors:EditorsColumn
+	#drawer:ComponentDrawer
+		events:
+			selected:function(item)
+				this.select(item.key);
+	#preview:Preview
+	#select:function(key)
+		this.selectedItem = this.data.components[key];
+		this.editors.update(this.selectedItem);
+		this.preview.update(this.selectedItem);
+		this.emit('selectedItemChanged');
+	#toggleAdminMode:function
+		this.isAdminMode = !this.isAdminMode;
+		this.emit('adminModeChanged'); 
+	#init:function
+		this.drawer.toggle();
+		document.addEventListener('keypress', e => {
+			if(e.keyCode === 94) { // 94 = '^'
+				this.toggleAdminMode();
+			}
+		});
+	#render:function
+		if(this.selectedItem) this.select(this.selectedItem.key);	
+		this.drawer.update(this.data);
+		this.first;
+		if(!this.first) {
+			this.first = true;
+			var c = SV.toArray(this.data.components)[0];
+			if(c) this.select(c.key);
+		}
+
+ComponentDrawer
+	style:
+		position: absolute;
+		left: -100px;
+		top: 0;
+		bottom: 0;
+		width: 120px;
+		background-color: #FFF;
+		z-index: 100;
+		box-shadow: 2px 2px 2px 2px #888;
+		border-right: 1px solid #BBB;
+		transition: left 0.5s;
+	#title 'Edit'
+		style:
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 2em;
+			line-height: 2em;
+			padding-left: 1em;
+			background-color: #0BB;
+			color: #FFF;
+	#toggleBtn[material-icons] 'keyboard_arrow_left'
+		style:
+			position: absolute;
+			top: 0;
+			right: 0;
+			color: #FFF;
+			margin-top: 0.2em;
+		events:
+			click:
+				this.toggle();
+	#addBtn[material-icons] 'add'
+		style:
+			position: absolute;
+			top: 0;
+			right: 1em;
+			color: #FFF;
+			margin-top: 0.2em;
+		events:
+			click:
+				this.addComponent();
+	#components:List({ ctor: 'ComponentItem' })[list]
+		style:
+			margin-top: 2em;
+			border-top: 1px solid #888;
+		events:
+			viewAdded:function(view)
+				view.on('selected', (item) => {
+					this.emit('selected', item);
+				});
+	#addComponent:function
+		if(!this.data.components) this.data.set('components', {});
+		var item = {
+			key: SyncNode.guidShort(),
+			created: new Date().toISOString(),
+			name: 'New Component',
+			note: '',
+			code: '',
+			data: ''
+		};
+		this.data.components.set(item.key, item);
+	#toggle:function
+		this.isOpen = !this.isOpen;
+		this.emit('toggle');
+		if(this.isOpen) {
+			this.node.style.left = '0px';
+			svml.instances.mainView.editors.node.style.left = '120px';
+			this.toggleBtn.innerHTML = 'keyboard_arrow_left';
+		} else {
+			this.node.style.left = '-100px';
+			svml.instances.mainView.editors.node.style.left = '20px';
+			this.toggleBtn.innerHTML = 'keyboard_arrow_right';
+		}
+	#updateAdminMode:function
+		var adminMode = svml.instances.mainView.isAdminMode;
+		this.addBtn.style.display = adminMode ? 'inline-block' : 'none';
+	#init:function
+		this.updateAdminMode();
+		svml.instances.mainView.on('adminModeChanged', () => {
+			this.updateAdminMode();
+		});
+	#render:function
+		this.components.update(this.data.components);
+
+
+ComponentItem[item tight]
+	style:
+		font-size: 10px;
+		border-bottom: 1px solid #BBB;
+	events:
+		click:
+			this.emit('selected', this.data);
+	#nameSpan $(data.name)
+	#updateIsSelected:function
+		var selected = this.data.key === ((svml.instances.mainView.selectedItem || {}).key);
+		this.node.classList.toggle('selected', selected);
+	#init:function
+		svml.instances.mainView.on('selectedItemChanged', () => { this.updateIsSelected(); });	
+	#render:function
+		this.updateIsSelected();
+
+EditorsColumn[col-flex]
+	style:
+		position: absolute;
+		left: 20; 
+		top: 0;
+		bottom: 100%;
+		right: 50%;
+		transition: left 0.5s;
+		overflow: hidden;
+	#details:EditDetails[col-nofill] $(update=data)
+	#editor:Editor[col-fill]
+		style:
+			transition: height 0.5s;
+		events:
+			save:function(val)
+				this.data.set('code', val);
+	#dataEditor:Editor[col-nofill]
+		style:
+			height: 40%;
+			border-top: 1px solid #BBB;
+			transition: height 0.5s;
+		events:
+			save:function(val)
+				try {
+					eval('var data = ' + val + ';');
+					data.version = SyncNode.guidShort();
+					this.data.merge({
+						__remove: 'data',
+						data: data
+					});
+				} catch (e) {
+					console.log('Could not parse data.');
+				}
+	#render:function
+		if(this.data) {
+			this.node.style.bottom = '0';
+			this.editor.update(this.data.code || '');
+			var dataStr = JSON.stringify(this.data.data || {}, null, '\t');
+			this.dataEditor.update(dataStr);	
+		} else {
+			this.node.style.bottom = '100%';
+		}
+
+EditDetails[row row-flex]
+	style:
+		border-bottom: 1px solid #BBB;
+		padding: 4px;
+	#nameInput:Input({ prop: 'name' }) $(update=data)
+		style:
+			display: none;
+	#remove:button 'Delete'
+		style:
+			display: none;
+		events:
+			click:
+				Modal.confirm('Delete Component?', '', () => {
+					var key = this.data.key;
+					var parent = this.data.parent;
+					svml.instances.mainView.select(null);
+					parent.remove(key);
+				});
+	#setDefault:button 'Set Default'
+		style:
+			display: none;
+		events:
+			click:
+				this.data.set('defaults', {
+					code: this.data.code,
+					data: this.data.data
+				})
+	#empty[row-fill]
+	#restoreDefault:button 'Reset'
+		events:
+			click:
+				this.data.merge({
+					__remove: 'data',
+					code: this.data.defaults.code,
+					data: this.data.defaults.data
+				})
+	#keyBindings:Select({ values: ['default', 'vim'] })
+		events:
+			selected:function(val)
+				localSettings.set('keyMap', val);
+	#updateAdminMode:function
+		var adminMode = svml.instances.mainView.isAdminMode;
+		this.setDefault.style.display = adminMode ? 'inline-block' : 'none';
+		this.remove.style.display = adminMode ? 'inline-block' : 'none';
+		this.nameInput.node.style.display = adminMode ? 'inline-block' : 'none';
+		this.keyBindings.node.style.display = adminMode ? 'inline-block' : 'none';
+	#init:function
+		this.updateAdminMode();
+		svml.instances.mainView.on('adminModeChanged', () => {
+			this.updateAdminMode();
+		});
+
+Editor
+	style:
+		position: relative;
+	events:
+		keydown(e):	
+			if(e.ctrlKey && e.keyCode === 83) {
+				e.preventDefault();
+				this.doSave();
+				return false;
+			}
+	#doSave:function
+		this.emit('save', this.cm.getValue());
+	#init:function
+		this.cm = CodeMirror(this.node, {
+			mode: "svml",
+			keyMap: localSettings.keyMap || 'default',
+			lineNumbers: true,
+			indentWithTabs: true
+		});
+		this.cm.save = () => {
+			this.doSave();
+		};
+		localSettings.on('updated', () => {
+			if(localSettings.keyMap === 'vim') {
+				this.cm.setOption('vimMode', true);
+			} else {
+				this.cm.setOption('vimMode', false);
+			}
+		});
+	#render:function
+		var cursor = this.cm.getCursor();
+		this.cm.setValue(this.data);
+		this.cm.setCursor(cursor);
+
+
+Preview
+	style:
+		position: absolute;
+		left: 50%; 
+		top: 0;
+		bottom: 0;
+		right: 0;
+		border-left: 1px solid #666;
+	#render:function
+		this.node.innerHTML = '';
+		if(this.data) {
+			var svmlPreview = new SyncViewML();
+			svmlPreview.parse(this.data.code, this.node);
+			if(svmlPreview.instances.mainView) {
+				if(!this.data.data) this.data.set('data', {});
+				svmlPreview.instances.mainView.update(this.data.data || {});
+			}
+		}
+
+		
+</script>

@@ -1,0 +1,519 @@
+<html>
+<head>
+<link rel="stylesheet" type="text/css" href="/css/app.css">
+<link rel="import" id="components" href="/lib/svml/components.html">
+<script type="text/javascript" src="https://www.youtube.com/iframe_api"></script>
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/lib/moment.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNode.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncNodeSocket.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncView.js"></script>
+<script type="text/javascript" src="/lib/svml/SyncViewML.js"></script>
+</head>
+<body style="background-color: #444; padding: 1em;">
+
+
+<script id="views" type="text/x-svml">
+
+#mainView:MainView
+!#requestSubmit:RequestSubmit
+!#requestEdit:RequestEdit
+
+
+MainView
+	style:
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		padding: 8px;
+		background-color: #666;
+	#leftColumn:LeftColumn
+		style:
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 630px;
+	#rightColumn:RightColumn
+		style:
+			position: absolute;
+			top: 0;
+			left: 630px;
+			right: 0;
+	#playLeft:function(item)
+		this.leftColumn.players.playerLeft.play(item);
+	#playRight:function(item)
+		this.leftColumn.players.playerRight.play(item);
+	#render:function
+		var sorted = {
+			queued: {},
+			requested: {},
+			history: {}
+		};
+		SV.forEach(this.data.music.queue, (item) => {
+			(sorted[item.status] || {})[item.key] = item;
+		});
+		this.leftColumn.queued.update(sorted.queued);
+		this.rightColumn.requested.update(sorted.requested);
+		this.rightColumn.history.update(sorted.history);
+
+		this.leftColumn.update(this.data);
+
+
+LeftColumn
+	style:
+		box-sizing: border-box;
+		padding: 1em;
+	#players:Players
+		events:
+			status:function(status)
+				if(status.status.duration > 60 && status.status.remaining < 20) {
+					if(this.isLoadingNext) return;
+					this.isLoadingNext = true;
+					if(status.side === 'left') {
+						this.players.playerRight.emit('play');		
+					} else {
+						this.players.playerLeft.emit('play');		
+					}
+				}
+			fadedIn:function(obj)
+				console.log('fadedIn here', obj);	
+				this.data.music.merge({
+					_remove: ['playingNow'],
+					playingNow: obj.player.data
+				});
+			fadedOut:function(obj)
+				this.isLoadingNext = false;
+				var nextItem = SV.toArray(this.queued.views, 'data.queueOrder')[0];
+				if(!nextItem) return;
+				this.data.music.merge({
+					_remove: ['playingNext'],
+					playingNext: nextItem.data
+				});
+				if(obj.side === 'left') {
+					nextItem.playLeft();
+				} else {
+					nextItem.playRight();
+				}
+				
+	:h4 'Queued'
+	#playingNow:Label({ label: 'Playing:' })
+	#playingNext:Label({ label: 'Next:' })
+	#reset:button 'Reset Labels'
+		events:
+			click:
+				this.data.music.merge({
+					__remove: ['playingNow', 'playingNext']
+				});
+	#queued:List({ ctor: 'QueueItem', sort: 'queueOrder' })[list]
+		style:
+			margin-top: 1em;
+	#render:function
+		if(this.data.music.playingNow)
+			this.playingNow.update(this.data.music.playingNow.info.title);
+		else
+			this.playingNow.update('');
+
+		if(this.data.music.playingNext)
+			this.playingNext.update(this.data.music.playingNext.info.title);
+		else
+			this.playingNext.update('');
+		
+Label[row-flex]
+	#label[row-nofill] $(options.label)
+		style:
+			display: inline-block;
+			width: 5em;
+	#value[row-fill] $(data)
+		style:
+			color: #FFF;
+			display: inline-block;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;	
+
+RightColumn
+	style:
+		box-sizing: border-box;
+		padding: 1em;
+	:h4 'Requests'
+	#request:Request $(update=data.music.queue)
+		style:
+			margin-top: 1em;
+	#requested:List({ ctor: 'QueueItem' })[list]
+		style:
+			margin-top: 1em;
+	:h4 'History'
+	#history:List({ ctor: 'QueueItem', sort: 'lastPlayed' })[list]
+		style:
+			margin-top: 1em;
+	
+
+Players
+	style:
+		position: relative;
+		height: 250px;
+	#playerLeft:PlayerControls
+		style:
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 50%;
+		events:
+			play:
+				this.playerRight.fadeOut();
+				this.playerLeft.fadeIn();
+			status:function(status)
+				this.emit('status', { side: 'left', status: status });
+			fadedIn:function
+				this.emit('fadedIn', { side: 'left', player: this.playerLeft });
+			fadedOut:function
+				this.emit('fadedOut', { side: 'left', player: this.playerLeft });
+	#playerRight:PlayerControls
+		style:
+			position: absolute;
+			top: 0;
+			left: 50%;
+			right: 0;
+		events:
+			play:
+				this.playerRight.fadeIn();
+				this.playerLeft.fadeOut();
+			status:function(status)
+				this.emit('status', { side: 'right', status: status });
+			fadedIn:function
+				this.emit('fadedIn', { side: 'right', player: this.playerRight });
+			fadedOut:function
+				this.emit('fadedOut', { side: 'right', player: this.playerRight });
+
+PlayerControls[col-flex]
+	#playerDiv
+	#status:PlayerStatus[col-nofill]
+	#fade:ProgressBar({ text: 'Fade' })
+		events:
+			click:
+				this.emit('play');
+	#getStatus:function
+		var result = {
+			key: SyncNode.guidShort(),
+			duration: this.player.getDuration(),
+			currentTime: this.player.getCurrentTime()	
+		};
+		result.remaining = result.duration - result.currentTime;
+		return result;
+	#updateStatus:function
+		var status = this.getStatus(this.player);
+		this.status.update(status);
+		this.emit('status', status);
+	#play:function(item);
+		if(this.player.getVolume() > 0) {
+			console.log('Skipping playing, player has volume > 0.');
+			return;
+		}
+		this.update(item);
+		this.player.setVolume(0);		
+		this.player.loadVideoById(item.id);
+		this.player.seekTo(20);
+		this.player.pauseVideo();
+		item.merge({ 
+			status: 'history', 
+			lastPlayed: new Date().toISOString(),
+			playedCount: (item.playedCount || 0) + 1
+		});
+	#fadeIn:function
+		var vol = this.player.getVolume();
+		this.player.playVideo();
+		var fadeHelper = () => {
+			if(vol < 100) {
+				vol += 5;
+				if(vol > 100) vol = 100;
+				this.player.setVolume(vol);
+				this.fade.update({ key: SyncNode.guidShort(), progress: vol });
+				setTimeout(() => {
+					fadeHelper();			
+				}, 200);
+			} else {
+				this.emit('fadedIn');
+			}
+		};
+		fadeHelper();
+	#fadeOut:function
+		var vol = this.player.getVolume();
+		var fadeHelper = () => {
+			if(vol > 0) {
+				vol -= 5;
+				if(vol < 0) vol = 0;
+				this.player.setVolume(vol);
+				this.fade.update({ key: SyncNode.guidShort(), progress: vol });
+				setTimeout(() => {
+					fadeHelper();			
+				}, 200);
+			} else {
+				this.emit('fadedOut');
+			}
+		};
+		fadeHelper();
+	#init:function
+		this.player = new YT.Player(this.playerDiv, {
+			height: '200',
+			width: '300',
+			videoId: '',
+			events: {
+				onReady: () => {
+					this.player.setVolume(0);
+					setInterval(() => {
+						this.updateStatus();
+					}, 1000);
+				}
+			}
+		});
+
+ProgressBar
+	style:
+		position: relative;
+		background-color: #DDD;
+		width: 100%;
+		height: 1.5em;
+		border: 1px solid #BBB;
+	#bar
+		style:
+			position: absolute;
+			top: 0;
+			left: 0;
+			bottom: 0;
+			right: 100%;
+			transition: right 0.2s;
+			transition-timing-function: linear;
+	#status
+		style:
+			position: absolute;
+			top: 0;
+			left: 0;
+			bottom: 0;
+			right: 0;
+			text-align: center;
+			padding .25em;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+		events:
+			click:
+				this.emit('click');	
+	#init:function	
+		this.status.innerHTML = this.options.text || '';
+		this.bar.style.backgroundColor = this.options.color || '#7F7';
+	#render:function
+		this.bar.style.right = (100 - this.data.progress) + '%';
+		if(this.data.hasOwnProperty('text')) this.status.innerHTML = this.data.text;
+
+PlayerStatus
+	#progress:ProgressBar({ color: '#77F' })
+	#formatTime:function(seconds)
+		var d = moment("2015-01-01").startOf('day');
+		return d.seconds(seconds).format('mm:ss');	
+	#render:function
+		if(this.data) {
+			var progress = 0;
+			if(this.data.currentTime > 0) {
+				 progress =  (this.data.currentTime / this.data.duration) * 100;
+			}
+			var text = this.formatTime(this.data.remaining || 0);
+			text += '/' + this.formatTime(this.data.duration);
+			this.progress.update({
+				progress: progress,
+				text: text
+			});	
+		}
+			
+Request
+	#input:input
+		style:
+			width: 30em;
+	#addBtn:button 'Request'
+		style:
+			margin-left: 1em;
+		events:
+			click:
+				var id = this.input.value;
+				if(id.length > 12) {
+					var result = /v=(.*$)/.exec(id);
+					if(!result) return; 
+					id = result[1];
+				}
+				var item = {
+					key: id,
+					createdAt: new Date().toISOString(),
+					id: id,
+					status: 'requested',
+					requestId: SyncNode.guidShort()
+				};
+				requestIds[item.requestId] = item;
+				io().emit('get video info', item);
+	#init:function
+		io().on('get video info result', (item) => {
+			if(requestIds[item.requestId]) {
+				delete requestIds[item.requestId];
+				svml.instances.requestSubmit.update(item);
+				svml.instances.requestSubmit.show();
+			}
+		});
+
+QueueItem[item row row-flex tight]
+	style:
+		padding-left: 0;
+		border-bottom: 1px solid #999;
+	#playNextBtn[material-icons row-nofill] 'keyboard_arrow_up'
+		events:
+			click:
+				var queueOrder = 0;
+				SV.forEach(this.data.parent, (item) => {
+					if(item.queueOrder < queueOrder) queueOrder = item.queueOrder;
+				});
+				this.data.merge({
+					status: 'queued',
+					queueOrder: queueOrder - 1
+				});
+	#playLeftBtn[material-icons row-nofill] 'keyboard_arrow_left'
+		events:
+			click:
+				this.playLeft();
+	#playRightBtn[material-icons row-nofill] 'keyboard_arrow_right'
+		events:
+			click:
+				this.playRight();
+	#playLeft:function
+			svml.instances.mainView.playLeft(this.data);
+	#playRight:function
+			svml.instances.mainView.playRight(this.data);
+	#edit[material-icons row-nofill] 'settings'
+		events:
+			click:
+				svml.instances.requestEdit.update(this.data);
+				svml.instances.requestEdit.show();
+	#move[material-icons row-nofill] 'play_arrow'
+		events:
+			click:
+				this.move();
+	#move:function
+		if(this.data.status === 'queued') {
+			this.data.merge({
+				__remove: ['queueOrder'],
+				status: 'history'
+			});
+		} else if(this.data.status === 'history' || this.data.status === 'requested') {
+			var queueOrder = 0;
+			SV.forEach(this.data.parent, (item) => {
+				if(item.queueOrder > queueOrder) queueOrder = item.queueOrder;
+			});
+			this.data.merge({ 
+				status: 'queued',
+				queueOrder: queueOrder + 1,
+				queuedAt: new Date().toISOString()
+			});
+		}
+	#requestedTime[row-nofill]
+		style:
+			padding-left: 1em;
+	#title[row-fill] $(data.info.title)
+		style:
+			padding-left: 8px;
+			color: #BBB;
+	#render:function
+		var m;
+		switch(this.data.status) {
+			case 'requested':
+				m = moment(this.data.requestedAt)
+				break;
+			case 'queued':
+				m = moment(this.data.queuedAt)
+				break;
+			default:
+				if(this.data.lastPlayed) m = moment(this.data.lastPlayed);
+				break;
+		}
+		if(m) this.requestedTime.innerHTML = m.format('hh:mm:ss');
+
+
+RequestSubmit
+	#videoTitle:h4 $(data.info.title)
+	#submit[btn] 'Request Video'
+		style:
+			margin-top: 1em;
+		events:
+			click:
+				var queue = svml.instances.mainView.data.music.queue;
+				var existing = queue[this.data.key];
+				if(existing) {
+					if(existing.status === 'queued') {
+						Modal.showNotification('Video is queued to play.');
+						this.modal.hide();
+						return;
+					}
+					existing.merge({
+						requestedAt: new Date().toISOString(),
+						status: 'requested'
+					});
+				} else {
+					this.data.requestedAt = new Date().toISOString();
+					this.data.status = 'requested';
+					queue.set(this.data.key, this.data);
+				}
+				svml.instances.mainView.rightColumn.request.input.value = '';
+				this.modal.hide();
+	#cancel[btn] 'Cancel'
+		events:
+			click:
+				this.modal.hide();
+	#show:function
+		this.modal.show();
+	#init:function
+		this.modal = Modal.createModal(this);
+		
+RequestEdit
+	#idSpan:p $(data.id)
+	#videoTitle:Input({ label: 'Title', prop: 'title' }) $(update=data.info)
+	#ok[btn] 'Ok'
+		style:
+			margin-top: 1em;
+		events:
+			click:
+				this.modal.hide();
+	#remove[btn] 'Remove'
+		events:
+			click:
+				this.data.parent.remove(this.data.key);
+				this.modal.hide();
+	#show:function
+		this.modal.show();
+	#init:function
+		this.modal = Modal.createModal(this);
+	
+
+</script>
+
+
+
+<script>
+"use strict"
+
+
+SV.startReloader();
+
+var sync = new SyncNodeSocket('/data', {});
+var svml = new SyncViewML();
+var requestIds = {};
+SV.onLoad(() => { 
+		svml.importCode('components'); 
+		svml.parse(SV.id('views').innerHTML); 
+		var done;
+		sync.on('updated', (data) => {
+			svml.instances.mainView.update(data);
+		});
+		
+});
+
+
+</script>
+</body>
+</html>

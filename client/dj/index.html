@@ -1,9 +1,10 @@
-<htme>
+<html>
 <head>
 <link rel="stylesheet" type="text/css" href="/css/app.css">
 <link rel="import" id="components" href="/lib/svml/components.html">
 <script type="text/javascript" src="https://www.youtube.com/iframe_api"></script>
 <script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="/lib/moment.js"></script>
 <script type="text/javascript" src="/lib/svml/SyncNode.js"></script>
 <script type="text/javascript" src="/lib/svml/SyncNodeSocket.js"></script>
 <script type="text/javascript" src="/lib/svml/SyncView.js"></script>
@@ -20,84 +21,108 @@
 
 
 MainView
-	:style
+	style:
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
 		padding: 8px;
-		background-color: #FFF;
-	#title:h1 'Music'
+		background-color: #666;
+	#leftColumn:LeftColumn $(update=data)
 		style:
-			color: #FFF;
-	#playerLeftDiv
-	#playerRightDiv
-	:hr
-	:button 'Fade Left'
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 630px;
+	#rightColumn:RightColumn
 		style:
-			margin-left: 1em;
-			width: 21em;
-			height: 3em;
-		events:
-			click:
-				this.fade(this.playerRight, this.playerLeft);
-	:button 'Fade Right'
-		style:
-			margin-left: 4em;
-			width: 21em;
-			height: 3em;
-		events:
-			click:
-				this.fade(this.playerLeft, this.playerRight);
-	:hr
-	#queue:Queue $(update=data.music.queue)
-		style:
-			margin-top: 1em;
+			position: absolute;
+			top: 0;
+			left: 630px;
+			right: 0;
 	#playLeft:function(id)
-		this.play(id, this.playerLeft);
+		this.play(id, this.leftColumn.players.playerLeft.player);
 	#playRight:function(id)
-		this.play(id, this.playerRight);
+		this.play(id, this.leftColumn.players.playerRight.player);
 	#play:function(id, player);
+		if(player.getVolume() > 0) {
+			console.log('Skipping playing, player has volume > 0.');
+			return;
+		}
 		player.setVolume(0);		
 		player.loadVideoById(id);
-	#fade:function(from, to)
-		var volFrom = 100;
-		var volTo = 0;
-		function fadeHelper() {
-			from.setVolume(volFrom);
-			to.setVolume(volTo);
-			if(volFrom > 0) {
-				volFrom -= 5;
-				volTo += 5;
-				setTimeout(() => {
-					fadeHelper();			
-				}, 200);
-			}
-		}
-		fadeHelper();
-		
-		
-	#init:function
-		this.playerLeft = new YT.Player(this.playerLeftDiv, {
-			height: '200',
-			width: '300',
-			videoId: '',
-			events: {}
-		});
-		this.playerRight = new YT.Player(this.playerRightDiv, {
-			height: '200',
-			width: '300',
-			videoId: ''
-		});
+		player.seekTo(20);
+		player.pauseVideo();
 	#render:function
+		var sorted = {
+			queued: {},
+			requested: {},
+			history: {}
+		};
+		SV.forEach(this.data.music.queue, (item) => {
+			(sorted[item.status] || {})[item.key] = item;
+		});
+		this.leftColumn.queued.update(sorted.queued);
+		this.rightColumn.requested.update(sorted.requested);
+		this.rightColumn.history.update(sorted.history);
 
 
 
-
-			
-
-Queue
+LeftColumn
 	style:
-		width: 50em;
+		box-sizing: border-box;
+		padding: 1em;
+	#playingNow:Label({ label: 'Playing:' })
+	#playingNext:Label({ label: 'Next:' })
+	:h4 'Queue'
+		style:
+			margin-top: 1em;
+	#queued:List({ ctor: 'QueueItem', sort: 'queuedAt' })[list]
+		style:
+			margin-top: 1em;
+	#render:function
+		if(this.data.music.playingNow)
+			this.playingNow.update(this.data.music.playingNow.info.title);
+		else
+			this.playingNow.update('');
+
+		if(this.data.music.playingNext)
+			this.playingNext.update(this.data.music.playingNext.info.title);
+		else
+			this.playingNext.update('');
+
+Label[row-flex]
+	#label[row-nofill] $(options.label)
+		style:
+			display: inline-block;
+			width: 5em;
+	#value[row-fill] $(data)
+		style:
+			color: #FFF;
+			display: inline-block;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;	
+
+RightColumn
+	style:
+		box-sizing: border-box;
+		padding: 1em;
+	:h4 'Requests'
+	#request:Request $(update=data.music.queue)
+		style:
+			margin-top: 1em;
+	#requested:List({ ctor: 'QueueItem', sort: 'requestedAt' })[list]
+		style:
+			margin-top: 1em;
+	:h4 'History'
+	#history:List({ ctor: 'QueueItem', sort: 'lastPlayed' })[list]
+		style:
+			margin-top: 1em;
+Request
 	#input:input
 		style:
-			margin-left: 1em;
 			width: 30em;
 	#addBtn:button 'Request'
 		style:
@@ -111,52 +136,72 @@ Queue
 					id = result[1];
 				}
 				var item = {
-					key: SyncNode.guidShort(),
+					key: id,
 					createdAt: new Date().toISOString(),
-					id: id
+					id: id,
+					status: 'requested',
+					requestId: SyncNode.guidShort()
 				};
+				requestIds[item.requestId] = item;
 				io().emit('get video info', item);
-	#list:List({ ctor: 'QueueItem' })[list]
-		style:
-			margin-top: 1em;
 	#init:function
 		io().on('get video info result', (item) => {
-			svml.instances.requestSubmit.update(item);
-			svml.instances.requestSubmit.show();
+			if(requestIds[item.requestId]) {
+				delete requestIds[item.requestId];
+				svml.instances.requestSubmit.update(item);
+				svml.instances.requestSubmit.show();
+			}
 		});
-	#render:function
-		this.list.update(this.data);
 
 QueueItem[item row row-flex tight]
-	#playLeft:button[row-nofill] 'Left'
+	style:
+		padding-left: 0;
+		border-bottom: 1px solid #999;
+	#requestBtn[material-icons row-nofill] 'play_arrow'
+		style:
+			padding-right: 8px;
 		events:
 			click:
-				svml.instances.mainView.playLeft(this.data.id);
-	#playRight:button[row-nofill] 'Right'
-		events:
-			click:
-				svml.instances.mainView.playRight(this.data.id);
-	#edit:button[row-nofill] 'Edit'
-		events:
-			click:
-				svml.instances.requestEdit.update(this.data);
-				svml.instances.requestEdit.show();
+				this.request();
 	#title[row-fill] $(data.info.title)
 		style:
-			padding-left: 8px;
 			color: #BBB;
+	#request:function
+		if(this.data.status === 'history') {
+			svml.instances.requestSubmit.update(this.data);
+			svml.instances.requestSubmit.show();
+		}
+	#render:function
+		var m;
+		var canRequest = this.data.status === 'history';
+		this.requestBtn.style.display = canRequest ? 'flex' : 'none';
 
 
 RequestSubmit
-	#videoTitle:h1 $(data.info.title)
+	#videoTitle:h4 $(data.info.title)
 	#submit[btn] 'Request Video'
 		style:
 			margin-top: 1em;
 		events:
 			click:
-				this.data.createdAt = new Date().toISOString();
-				svml.instances.mainView.data.music.queue.set(this.data.key, this.data);
-				svml.instances.mainView.queue.input.value = '';
+				var queue = svml.instances.mainView.data.music.queue;
+				var existing = queue[this.data.key];
+				if(existing) {
+					if(existing.status === 'queued') {
+						Modal.showNotification('Video is queued to play.');
+						this.modal.hide();
+						return;
+					}
+					existing.merge({
+						requestedAt: new Date().toISOString(),
+						status: 'requested'
+					});
+				} else {
+					this.data.requestedAt = new Date().toISOString();
+					this.data.status = 'requested';
+					queue.set(this.data.key, this.data);
+				}
+				svml.instances.mainView.rightColumn.request.input.value = '';
 				this.modal.hide();
 	#cancel[btn] 'Cancel'
 		events:
@@ -166,8 +211,6 @@ RequestSubmit
 		this.modal.show();
 	#init:function
 		this.modal = Modal.createModal(this);
-	#render:function
-		console.log('data', this.data);
 		
 RequestEdit
 	#idSpan:p $(data.id)
@@ -187,8 +230,6 @@ RequestEdit
 		this.modal.show();
 	#init:function
 		this.modal = Modal.createModal(this);
-	#render:function
-		console.log('data', this.data);
 	
 
 </script>
@@ -202,17 +243,13 @@ RequestEdit
 SV.startReloader();
 
 var sync = new SyncNodeSocket('/data', {});
-window.List = List;
-window.Input = Input;
-
 var svml = new SyncViewML();
+var requestIds = {};
 SV.onLoad(() => { 
 		svml.importCode('components'); 
 		svml.parse(SV.id('views').innerHTML); 
+		var done;
 		sync.on('updated', (data) => {
-			if(!data.music) {
-					data.set('music', { queue: {} });
-			}
 			svml.instances.mainView.update(data);
 		});
 		

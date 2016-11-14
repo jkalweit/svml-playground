@@ -387,7 +387,7 @@ class List extends SyncView {
 		}
 		render() {
 				var data = this.data || {};
-				var itemsArr = SV.toArray(data, this.sort, this.sortDirection);
+				var itemsArr = SV.toArray(data, this.sort, this.sortDirection === 'reverse');
 				var previous = null;
 				itemsArr.forEach((item) => {
 								var view  = this.views[item.key];

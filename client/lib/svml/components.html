@@ -96,10 +96,11 @@ DateInput[label-set]
 LabeledValue[label-set]
 	#label[label]
 	#value[value]
-	#init
+	#init:function
 		this.options = this.options || {};
 		this.label.innerHTML = this.options.label;
 	#render:function
+		console.log('here', this.data);
 		this.value.style.textAlign = this.options.number ? 'right' : 'left';
 		if(this.options.prop && this.data) {
 			var val = SV.getProperty(this.data, this.options.prop);

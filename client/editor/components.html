@@ -151,6 +151,10 @@ EditorsColumn[col-flex]
 		transition: left 0.5s;
 		overflow: hidden;
 	#details:EditDetails[col-nofill] $(update=data)
+		events:
+			toggleDataEditor:
+				this.isDataHidden = !this.isDataHidden;
+				this.dataEditor.node.style.height = this.isDataHidden ? '0' : '40%';
 	#editor:Editor[col-fill]
 		style:
 			transition: height 0.5s;
@@ -211,6 +215,10 @@ EditDetails[row row-flex]
 					code: this.data.code,
 					data: this.data.data
 				})
+	#toggleDataEditor:button 'Toggle Data'
+		events:
+			click:
+				this.emit('toggleDataEditor');
 	#empty[row-fill]
 	#restoreDefault:button 'Reset'
 		events:
